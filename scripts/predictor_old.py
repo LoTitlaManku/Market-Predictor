@@ -728,7 +728,7 @@ def generate_forecasts(processed_df: pd.DataFrame, assets: tuple, tech_info: tup
     target_dates = get_market_dates(last_trade_date, horizons, period)
     if len(target_dates) < 1: return {}
 
-    # Calculate forecastSs
+    # Calculate forecasts
     for step, actual_time in horizons.items():
         if target_dates[step] is None: continue
 

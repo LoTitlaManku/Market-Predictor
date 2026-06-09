@@ -560,11 +560,14 @@ if __name__ in "__main__":
     import time
     start = time.perf_counter()
 
-    from predictor import TrainingManager, Settings
+    from predictor import TrainingManager, Settings, run_prediction_pipeline
     Settings.LOGGING = True
-    print("Starting...")
+    Settings.GPU = False
+    print("Training...")
     success = TrainingManager().run_training_pipeline("AAPL", "1d", horizon=4)
     print(success)
+    print("Predicting...")
+    run_prediction_pipeline("AAPL", "1d")
 
     # initial_download()
 

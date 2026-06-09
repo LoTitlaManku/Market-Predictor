@@ -1,4 +1,3 @@
-
 import os
 
 import pandas as pd
@@ -13,14 +12,15 @@ class TechnicalAnalysisAccessor:
     def __init__(self, pandas_obj: pd.DataFrame):
         self._obj = pandas_obj
 
-    def add_indicators(self, ticker: str, interval: str, horizon: int = 4) -> pd.DataFrame:
+    def add_indicators(self, ticker: str, interval: str, horizon: int = 4, include_targets: bool = True) -> pd.DataFrame:
         df = self._obj
         df.index = df.index.astype('datetime64[ms]')
 
         # Add all indicators
         df = self._add_sentiment(df, ticker)
         df = self._add_technical_indicators(df)
-        df = self._add_targets(df, horizon)
+        if include_targets:
+            df = self._add_targets(df, horizon)
         df = self._add_vix(df, interval)
         df = self._add_spy(df, interval)
         df = self._add_vix_plus(df, interval)
