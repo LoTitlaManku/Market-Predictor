@@ -1,0 +1,17 @@
+
+# Python things
+.venv/
+.idea/
+.git/
+
+# Local storage
+cache_files/
+models/
+ledgers*/
+.bin/
+plots/
+results/
+scripts/catboost_info/
+
+# UV and others
+uv.lock
