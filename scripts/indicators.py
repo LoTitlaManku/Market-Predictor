@@ -13,14 +13,14 @@ class TechnicalAnalysisAccessor:
     def __init__(self, pandas_obj: pd.DataFrame):
         self._obj = pandas_obj
 
-    def add_indicators(self, ticker: str, interval: str) -> pd.DataFrame:
+    def add_indicators(self, ticker: str, interval: str, horizon: int = 4) -> pd.DataFrame:
         df = self._obj
         df.index = df.index.astype('datetime64[ms]')
 
         # Add all indicators
         df = self._add_sentiment(df, ticker)
         df = self._add_technical_indicators(df)
-        df = self._add_targets(df, interval)
+        df = self._add_targets(df, horizon)
         df = self._add_vix(df, interval)
         df = self._add_spy(df, interval)
         df = self._add_vix_plus(df, interval)
@@ -138,17 +138,17 @@ class TechnicalAnalysisAccessor:
         df['Efficiency_Ratio'] = price_diff / volatility  # 1.0 = Strong Trend, 0.0 = Choppy/Noisy
 
         # Other indicators
-        df['vol_ratio'] = df["return"].rolling(5).std() / df["return"].rolling(50).std()
+        df['vol_ratio'] = df['return'].rolling(5).std() / df['return'].rolling(50).std()
         df['hour'] = df.index.hour
         df['day_of_week'] = df.index.dayofweek
         df['month'] = df.index.month
 
         return df
 
-    def _add_targets(self, df: pd.DataFrame, interval: str) -> pd.DataFrame:
-        labels = np.zeros(len(df))
-
-        horizon = 4 # temp
+    @staticmethod
+    def _add_targets(df: pd.DataFrame, horizon: int) -> pd.DataFrame:
+        if horizon <= 0:
+            raise ValueError("horizon must be a positive integer")
 
         # Extract values to numpy for faster iteration
         close_prices = df['Adj Close'].values
@@ -156,29 +156,35 @@ class TechnicalAnalysisAccessor:
         low_prices = df['Low'].values
         atr_values = df['ATR'].values
 
+        labels = np.zeros(len(df))
+        tbm_returns = np.zeros(len(df))
+
         for i in range(len(df) - horizon):
-            current_price = close_prices[i]
+            start_price = close_prices[i]
             current_atr = atr_values[i]
 
-            upper_barrier = current_price + (current_atr * 1.5)
-            lower_barrier = current_price - (current_atr * 1.0)
+            upper_barrier = start_price + (current_atr * 1.5)
+            lower_barrier = start_price - (current_atr * 1.0)
+
+            labels[i] = 0
+            tbm_returns[i] = (close_prices[i + horizon] - start_price) / start_price
 
             # Scan the future window
             for j in range(1, horizon + 1):
-                future_idx = i + j
-
                 # Check Stop Loss (Pessimistic: check first)
-                if low_prices[future_idx] <= lower_barrier:
+                if low_prices[i + j] <= lower_barrier:
                     labels[i] = -1
+                    tbm_returns[i] = (lower_barrier - start_price) / start_price
                     break
-
                 # Check Profit Target
-                if high_prices[future_idx] >= upper_barrier:
+                if high_prices[i + j] >= upper_barrier:
                     labels[i] = 1
+                    tbm_returns[i] = (upper_barrier - start_price) / start_price
                     break
 
 
         df['target_profit'] = labels.astype(int)
+        df['tbm_return'] = tbm_returns
         return df.iloc[:-horizon]
 
     @staticmethod

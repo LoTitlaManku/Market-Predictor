@@ -20,6 +20,7 @@ dependencies = [
     "optuna>=4.8.0",
     "pandas>=3.0.1",
     "pandas-market-calendars>=5.3.1.2",
+    "pandas-stubs~=3.0.3",
     "psutil>=7.2.2",
     "pykalman>=0.11.2",
     "pyqt6>=6.10.2",

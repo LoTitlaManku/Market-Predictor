@@ -65,26 +65,43 @@ class TrainingManager:
 
     @staticmethod
     def evaluate_performance(actual: np.ndarray, predicted: np.ndarray, actual_returns: np.ndarray) -> tuple:
-        hit_rate = accuracy_score(actual, predicted)
+        actual = np.asarray(actual)
+        predicted = np.asarray(predicted).reshape(-1)
+        actual_returns = np.asarray(actual_returns).reshape(-1)
 
-        # Simulate trading: multiply signal by the bar's actual return
-        # -1=short mirrors the return, 0=flat earns nothing, 1=long earns the return
-        strategy_returns = actual_returns * predicted
-        volatility = strategy_returns.std()
-        sharpe = (strategy_returns.mean() / volatility) * np.sqrt(252) if volatility != 0 else 0.0
+        if not (len(actual) == len(predicted) == len(actual_returns)):
+            raise ValueError(
+                f"Evaluation arrays must align: actual={len(actual)}, "
+                f"predicted={len(predicted)}, returns={len(actual_returns)}"
+            )
 
-        return hit_rate, sharpe
+        acc = accuracy_score(actual, predicted)
 
-    def score(self, model, X_train, y_train, val_idx, actual_returns_train):
-        preds = model.predict(X_train[val_idx]) - 1
+        # Strategy return aligns with the direction predicted:
+        # Long (1) gets the path return, Short (-1) gets inverted path return, Hold (0) gets 0
+        strategy_returns = np.nan_to_num(actual_returns * predicted)
 
-        fold_acc, fold_sharpe = self.evaluate_performance(
-            y_train.iloc[val_idx].values,
-            preds,
-            actual_returns_train[val_idx]
-        )
+        if len(strategy_returns) < 2 or np.std(strategy_returns) == 0:
+            sharpe = 0.0
+        else:
+            sharpe = np.mean(strategy_returns) / (np.std(strategy_returns) + 1e-9) * np.sqrt(252)
 
-        return fold_sharpe
+        # Calculate stability
+        cumulative_returns = np.cumsum(strategy_returns)
+        if len(cumulative_returns) > 1:
+            from scipy import stats
+            x = np.arange(len(cumulative_returns))
+            slope, intercept, r_value, p_value, std_err = stats.linregress(x, cumulative_returns)
+            stability = r_value ** 2 if slope > 0 else 0.0
+        else:
+            stability = 0.0
+
+        return acc, sharpe, stability
+
+    def _score_fold(self, model, X_val: np.ndarray, y_val: np.ndarray, returns_val: np.ndarray) -> float:
+        preds = np.asarray(model.predict(X_val)).reshape(-1) - 1
+        accuracy, _, _ = self.evaluate_performance(y_val, preds, returns_val)
+        return accuracy
 
     @staticmethod
     def create_3d_sequences(data: np.ndarray, targets: np.ndarray, window: int = 30) -> tuple:
@@ -94,18 +111,21 @@ class TrainingManager:
             y.append(targets[i + window])
         return np.array(x, dtype=np.float32), np.array(y)
 
-    def _train_lgbm(self, hyperparams: dict, X_train: np.ndarray, y_train: pd.Series, X_test: np.ndarray,  y_test: pd.Series, actual_returns_test: np.ndarray) -> dict:
+    def _train_lgbm(self, horizon: int, hyperparams: dict, X_train: np.ndarray, y_train: pd.Series, X_test: np.ndarray,  y_test: pd.Series, actual_returns_train: np.ndarray, actual_returns_test: np.ndarray) -> dict:
         lgbm_params = hyperparams.copy()
         lgbm_params.update(dict(
+            n_estimators=100,
+            max_depth=5,
+            learning_rate=0.05,
             objective='multiclass',
             num_class=3,
-            n_estimators=200, # Will change with hyperparameter tuning
             class_weight='balanced',
             random_state=self.seed,
+            importance_type='gain',
             verbose=-1
         ))
         if Settings.GPU:
-            lgbm_params.update({"device": "gpu", "gpu_platform_id": 0, "gpu_device_id": 0})
+            lgbm_params.update({"device_type": "gpu", "gpu_platform_id": 0, "gpu_device_id": 0})
         if Settings.Threaded:
             lgbm_params.update({"num_threads": 1, "n_jobs": 1})
 
@@ -115,26 +135,26 @@ class TrainingManager:
         model = LGBMClassifier(**lgbm_params)
 
         # Walk-forward validation on training data only (no peeking at test set)
-        time_splitter = TimeSeriesSplit(n_splits=3)
+        time_splitter = TimeSeriesSplit(n_splits=3, gap=horizon)
         wf_scores = []
         for train_idx, val_idx in time_splitter.split(X_train):
             model.fit(X_train[train_idx], y_train_shifted.iloc[train_idx])
-            wf_scores.append(self.score(model, X_train, y_train, val_idx, actual_returns_test))
+            wf_scores.append(self._score_fold(model, X_train[val_idx], y_train.iloc[val_idx].values, actual_returns_train[val_idx]))
 
         # Retrain on full training set, then evaluate on the held-out test set
         model.fit(X_train, y_train_shifted)
         test_preds = model.predict(X_test) - 1  # Shift back to {-1,0,1} for evaluation
 
-        accuracy, sharpe = self.evaluate_performance(y_test.values, test_preds, actual_returns_test)
+        accuracy, sharpe, stability = self.evaluate_performance(y_test.values, test_preds, actual_returns_test)
         wf_mean = float(np.mean(wf_scores))
 
         return {
             'type': 'lgbm', 'model': model,
             'accuracy': accuracy, 'walk_forward_accuracy': wf_mean,
-            'sharpe': sharpe, 'stability': abs(accuracy - wf_mean),
+            'sharpe': sharpe, 'stability': stability,
         }
 
-    def _train_catboost(self, hyperparams: dict, X_train: np.ndarray, y_train: pd.Series, X_test: np.ndarray,  y_test: pd.Series, actual_returns_test: np.ndarray) -> dict:
+    def _train_catboost(self, horizon: int, hyperparams: dict, X_train: np.ndarray, y_train: pd.Series, X_test: np.ndarray,  y_test: pd.Series, actual_returns_train: np.ndarray, actual_returns_test: np.ndarray) -> dict:
         cat_params = hyperparams.copy()
         model = CatBoostClassifier(
             iterations=500, # Will change with hyperparameter tuning
@@ -148,33 +168,38 @@ class TrainingManager:
 
         y_train_shifted = y_train + 1
 
-        time_splitter = TimeSeriesSplit(n_splits=3)
+        time_splitter = TimeSeriesSplit(n_splits=3, gap=horizon)
         wf_scores = []
         for train_idx, val_idx in time_splitter.split(X_train):
             model.fit(X_train[train_idx], y_train_shifted.iloc[train_idx])
-            wf_scores.append(self.score(model, X_train, y_train, val_idx, actual_returns_test))
+            wf_scores.append(self._score_fold(model, X_train[val_idx], y_train.iloc[val_idx].values, actual_returns_train[val_idx]))
 
         model.fit(X_train, y_train_shifted)
         test_preds = model.predict(X_test).flatten() - 1  # Shift back to {-1,0,1}
 
-        accuracy, sharpe = self.evaluate_performance(y_test.values, test_preds, actual_returns_test)
+        accuracy, sharpe, stability = self.evaluate_performance(y_test.values, test_preds, actual_returns_test)
         wf_mean = float(np.mean(wf_scores))
 
         return {
             'type': 'cat', 'model': model,
             'accuracy': accuracy, 'walk_forward_accuracy': wf_mean,
-            'sharpe': sharpe, 'stability': abs(accuracy - wf_mean),
+            'sharpe': sharpe, 'stability': stability,
         }
 
-    def _train_lstm(self, hyperparams: dict, X_train: np.ndarray, y_train: pd.Series, X_test: np.ndarray,  y_test: pd.Series, actual_returns_test: np.ndarray) -> dict:
+    def _train_lstm(self, horizon: int, hyperparams: dict, X_train: np.ndarray, y_train: pd.Series, X_test: np.ndarray,  y_test: pd.Series, actual_returns_train: np.ndarray, actual_returns_test: np.ndarray) -> dict:
         lstm_params = hyperparams.copy()
+
+        window = 30
+        X_test_padded = np.vstack((X_train[-window:], X_test))
+        y_test_padded = np.concatenate((y_train.values[-window:], y_test.values))
 
         # Build (samples, window, features) sequences from the flat scaled arrays
         x_train_3d, y_train_seq = self.create_3d_sequences(X_train, y_train.values)
-        x_test_3d,  y_test_seq  = self.create_3d_sequences(X_test,  y_test.values)
+        x_test_3d,  y_test_seq  = self.create_3d_sequences(X_test_padded, y_test_padded, window=window)
 
         # Shift targets to {0,1,2} for CrossEntropyLoss; keep originals for evaluate_performance
         y_train_shifted = (y_train_seq + 1).astype(np.int64)
+        returns_train_seq = actual_returns_train[window:]
 
         input_dim = x_train_3d.shape[2]
 
@@ -210,12 +235,12 @@ class TrainingManager:
             )
 
         # Walk-forward validation across folds of the training sequences
-        time_splitter = TimeSeriesSplit(n_splits=3)
+        time_splitter = TimeSeriesSplit(n_splits=3, gap=horizon)
         wf_scores = []
         for train_idx, val_idx in time_splitter.split(x_train_3d):
             fold_model = build_skorch_model()
             fold_model.fit(x_train_3d[train_idx], y_train_shifted[train_idx])
-            wf_scores.append(self.score(fold_model, X_train, y_train, val_idx, actual_returns_test))
+            wf_scores.append(self._score_fold(fold_model, x_train_3d[val_idx], y_train_seq[val_idx], returns_train_seq[val_idx]))
 
         # Final model trained on all training sequences
         model = build_skorch_model()
@@ -225,13 +250,13 @@ class TrainingManager:
         test_preds = model.predict(x_test_3d) - 1
 
         # Align returns with the sequence offset (first LSTM_WINDOW bars are consumed as context)
-        accuracy, sharpe = self.evaluate_performance(y_test_seq, test_preds, actual_returns_test[30:])
+        accuracy, sharpe, stability = self.evaluate_performance(y_test_seq, test_preds, actual_returns_test)
         wf_mean = float(np.mean(wf_scores)) if wf_scores else 0.0
 
         return {
             'type': 'lstm', 'model': model,
             'accuracy': accuracy, 'walk_forward_accuracy': wf_mean,
-            'sharpe': sharpe, 'stability': abs(accuracy - wf_mean),
+            'sharpe': sharpe, 'stability': stability,
         }
 
     def _save_model_assets(self, ticker: str, interval: str, training_data_end: pd.Timestamp, results: list, feature_columns: list, scaler: StandardScaler) -> None:
@@ -269,58 +294,60 @@ class TrainingManager:
         joblib.dump(scaler, os.path.join(save_folder, "scaler.joblib"))
         joblib.dump(feature_columns, os.path.join(save_folder, "features.joblib"))
 
-    def run_training_pipeline(self, ticker: str, interval: str, override_data: pd.DataFrame = None, status_signal: tuple = None, force_train: bool = False) -> bool:
-        def log_update(msg):
+    def run_training_pipeline(self, ticker: str, interval: str, horizon: int = 4, override_data: pd.DataFrame = None, status_signal: tuple = None, force_train: bool = False) -> bool:
+        def log_update(msg, force_print=False):
             if status_signal:
                 u_queue, core_key = status_signal
                 u_queue.put((core_key, {"Current Task": msg}))
-            elif Settings.LOGGING:
-                print(msg)
+                if force_print: print(msg)
+
+            elif Settings.LOGGING: print(msg)
 
         model_path = os.path.join(MODEL_DIR, f"{ticker}_{interval}")
         if all_ticker_models_exist(model_path) and not force_train:
-            log_update(f"Model {ticker} ({interval}) already trained")
+            log_update(f"Model {ticker} ({interval}) already trained", True)
             return True
 
         if os.path.exists(model_path): shutil.rmtree(model_path)
 
         log_update("Loading data...")
-        data = override_data if override_data is not None else load_data(ticker, interval)
-        if data is None: print("No data"); return False
-
-        hyperparams = {}
-
-        log_update("Adding features...")
-        df = data.ind.add_indicators(ticker, interval)
-        if len(df) < 300:
-            print(f"Insufficient data for {ticker} ({interval}) — need 300+, got {len(df)}")
+        raw_data = override_data if override_data is not None else load_data(ticker, interval)
+        if raw_data is None or raw_data.empty:
+            log_update(f"No raw data for {ticker} ({interval})", True)
             return False
 
-        # print(df['target_profit'].value_counts(normalize=True))
-        # exit()
-
-        train_size = int(len(df) * (1 - self.__test_size))
-        train_df, test_df = df.iloc[:train_size], df.iloc[train_size:]
-
-        drop_cols = ['Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume', 'MA_200', 'return', 'target_profit']
-        feature_cols = [c for c in df.columns if c not in drop_cols]
-        X_train_raw, X_test_raw = train_df[feature_cols], test_df[feature_cols]
-        y_train, y_test = train_df['target_profit'], test_df['target_profit']
-        actual_returns_test = test_df['return'].values
+        log_update("Adding features...")
+        df = raw_data.ind.add_indicators(ticker, interval, horizon)
+        if len(df) < 300:
+            log_update(f"Insufficient processed data for {ticker} ({interval}) — need 300+, got {len(df)}", True)
+            return False
 
         log_update("Scaling features...")
+        drop_cols = ['Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume', 'MA_200', 'return', 'target_profit', 'tbm_return']
+        feature_cols = [c for c in df.columns if c not in drop_cols]
+
+        X, y = df[feature_cols].values, df['target_profit']
+
+        split_idx = int(len(df) * (1 - self.__test_size))
+        X_train_raw, X_test_raw = X[:split_idx], X[split_idx:]
+        y_train, y_test = y.iloc[:split_idx], y.iloc[split_idx:]
+
+        actual_returns_train = df['tbm_return'].loc[y_train.index].values
+        actual_returns_test = df['tbm_return'].loc[y_test.index].values
         scaler  = StandardScaler()
         X_train = scaler.fit_transform(X_train_raw)
         X_test  = scaler.transform(X_test_raw)
 
+        hyperparams = {}
+
         log_update("Training LGBM...")
-        lgbm_result = self._train_lgbm(hyperparams, X_train, y_train, X_test, y_test, actual_returns_test)
+        lgbm_result = self._train_lgbm(horizon, hyperparams, X_train, y_train, X_test, y_test, actual_returns_train, actual_returns_test)
 
         log_update("Training CatBoost...")
-        cat_result = self._train_catboost(hyperparams, X_train, y_train, X_test, y_test, actual_returns_test)
+        cat_result = self._train_catboost(horizon, hyperparams, X_train, y_train, X_test, y_test, actual_returns_train, actual_returns_test)
 
         log_update("Training LSTM...")
-        lstm_result = self._train_lstm(hyperparams, X_train, y_train, X_test, y_test, actual_returns_test)
+        lstm_result = self._train_lstm(horizon, hyperparams, X_train, y_train, X_test, y_test, actual_returns_train, actual_returns_test)
 
         results = [lgbm_result, cat_result, lstm_result]
 

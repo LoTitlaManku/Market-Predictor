@@ -560,10 +560,11 @@ if __name__ in "__main__":
     import time
     start = time.perf_counter()
 
-    # from predictor import run_prediction_pipeline
-    # print("Starting...")
-    # r = run_prediction_pipeline("AAPL", "1h")
-    # print(r)
+    from predictor import TrainingManager, Settings
+    Settings.LOGGING = True
+    print("Starting...")
+    success = TrainingManager().run_training_pipeline("AAPL", "1d", horizon=4)
+    print(success)
 
     # initial_download()
 
@@ -579,12 +580,11 @@ if __name__ in "__main__":
 
     # test_train()
     # test_predict()
-    validate_ledgers()
+    # validate_ledgers()
 
     # find_dupes()
     # list_dir()
     # check_model_corruption()
-
 
     print(time.perf_counter() - start)
     pass
