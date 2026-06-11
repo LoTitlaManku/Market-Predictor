@@ -1,0 +1,65 @@
+{
+    "4": [
+        {
+            "model_type": "LGBM",
+            "accuracy": 0.4045584045584046,
+            "walk_forward_sharpe": 4.547902763824136,
+            "sharpe": 1.8847970043470286,
+            "stability": 0.5807926235804621,
+            "best_params": {
+                "n_estimators": 324,
+                "learning_rate": 0.0003032498118551566,
+                "max_depth": 7,
+                "num_leaves": 196,
+                "min_child_samples": 86,
+                "subsample": 0.597061070949331,
+                "colsample_bytree": 0.8577519475538149,
+                "reg_alpha": 1.6191069223545678e-06,
+                "reg_lambda": 0.4628209024442469,
+                "objective": "multiclass",
+                "num_class": 3,
+                "class_weight": "balanced",
+                "random_state": 69,
+                "verbose": -1,
+                "device_type": "gpu"
+            }
+        },
+        {
+            "model_type": "CAT",
+            "accuracy": 0.5584045584045584,
+            "walk_forward_sharpe": 2.656080966430203,
+            "sharpe": 0.2489970539622088,
+            "stability": 0.004750497883655437,
+            "best_params": {
+                "iterations": 656,
+                "learning_rate": 0.0518009012823845,
+                "depth": 8,
+                "l2_leaf_reg": 0.010340749131324448,
+                "random_strength": 1.701840374641462,
+                "bagging_temperature": 0.27821787406194326,
+                "loss_function": "MultiClass",
+                "auto_class_weights": "Balanced",
+                "task_type": "CPU",
+                "verbose": false,
+                "random_state": 69
+            }
+        },
+        {
+            "model_type": "LSTM",
+            "accuracy": 0.4415954415954416,
+            "walk_forward_sharpe": 1.1749701028205728,
+            "sharpe": -1.3206191322574232,
+            "stability": 8.640085436775657e-05,
+            "best_params": {
+                "lr": 0.000273659833920734,
+                "module__hidden_dim": 128,
+                "module__num_layers": 2,
+                "module__dropout": 0.43948496162286665,
+                "optimizer__weight_decay": 0.0005069895323738177,
+                "max_epochs": 43,
+                "batch_size": 32,
+                "optimizer_name": "AdamW"
+            }
+        }
+    ]
+}

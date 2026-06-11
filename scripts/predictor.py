@@ -600,7 +600,7 @@ def generate_forecasts(processed_df: pd.DataFrame, assets: tuple, tech_info: tup
         p_cat = cat_model.predict_proba(scaled_row)[0]
         probs["CAT"] = float((p_cat[2] - p_cat[0] + 1) / 2)
 
-        # Calculate tracking layer weight priorities based on new multiclass metadata
+        # Calculate weights
         for m_type in ["LSTM", "LGBM", "CAT"]:
             model_meta = meta.get("models", {}).get(m_type, {})
             ticker_sharpe = abs(model_meta.get("sharpe", 0.0))
