@@ -10,15 +10,15 @@ import pandas as pd
 import pandas_market_calendars as mcal
 from lightgbm import LGBMClassifier
 from sklearn.metrics import accuracy_score, confusion_matrix
-from sklearn.model_selection import TimeSeriesSplit
+from sklearn.utils.class_weight import compute_class_weight
 from catboost import CatBoostClassifier
 import optuna
 from sklearn.preprocessing import StandardScaler
 import torch
 import torch.nn as nn
 from skorch import NeuralNetClassifier
-from skorch.callbacks import EarlyStopping, Callback
-from skorch import dataset
+from skorch.callbacks import Callback
+from scipy import stats # noqa
 
 # Set environment variables and filters
 warnings.filterwarnings("ignore")
@@ -26,7 +26,7 @@ NYSE_CAL = mcal.get_calendar('NYSE')
 
 # Custom imports
 from scripts.config import DATA_DIR
-import scripts.indicators_tuning
+import scripts.indicators_tuning # noqa
 
 class Settings:
     VERBOSE = 1 # Set whether to display logging or not
@@ -75,7 +75,6 @@ class PurgedTimeSeriesSplit:
             if len(test_indices) > 0:
                 yield train_indices, test_indices
 
-
 # Custom Skorch callback to report intermediate validation metrics to Optuna for pruning
 class OptunaPruningCallback(Callback):
     def __init__(self, trial, monitor: str = 'train_loss'):
@@ -95,6 +94,31 @@ class TrainingManager:
     def __init__(self):
         self.seed = 69
         self.__test_size = 0.2
+
+        self.X_train = None
+        self.X_test = None
+        self.y_train = None
+        self.y_test = None
+        self.returns_train = None
+        self.returns_test = None
+
+    def _prepare_data(self, df: pd.DataFrame):
+        drop_cols = ['Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume', 'MA_200', 'return', 'target_profit', 'tbm_return']
+        feature_cols = [c for c in df.columns if c not in drop_cols]
+
+        # Partition the fully processed data
+        split_idx = int(len(df) * (1 - self.__test_size))
+        train_df, test_df = df.iloc[:split_idx], df.iloc[split_idx:]
+
+        X_train_raw = train_df[feature_cols].values
+        X_test_raw = test_df[feature_cols].values
+
+        self.y_train,       self.y_test       = train_df['target_profit'],     test_df['target_profit']
+        self.returns_train, self.returns_test = train_df['tbm_return'].values, test_df['tbm_return'].values
+
+        scaler = StandardScaler()
+        self.X_train = scaler.fit_transform(X_train_raw)
+        self.X_test = scaler.transform(X_test_raw)
 
     @staticmethod
     def evaluate_performance(interval: str, actual: np.ndarray, predicted: np.ndarray, actual_returns: np.ndarray) -> tuple:
@@ -120,7 +144,6 @@ class TrainingManager:
         # Calculate stability
         cumulative_returns = np.cumsum(strategy_returns)
         if len(cumulative_returns) > 1:
-            from scipy import stats
             x = np.arange(len(cumulative_returns))
             slope, intercept, r_value, p_value, std_err = stats.linregress(x, cumulative_returns)
             stability = r_value ** 2 if slope > 0 else 0.0
@@ -138,9 +161,8 @@ class TrainingManager:
         return np.array(x, dtype=np.float32), np.array(y)
 
     # Train and tune LightGBM with walk-forward validation
-    def _train_lightgbm(self, interval: str, horizon: int, X_train: np.ndarray, y_train: pd.Series, X_test: np.ndarray, y_test: pd.Series, actual_returns_train: np.ndarray, actual_returns_test: np.ndarray) -> dict:
-        y_train_shifted = y_train + 1
-        # Use our custom Purged & Embargoed split for accurate financial evaluation
+    def _train_lightgbm(self, interval: str, horizon: int) -> dict:
+        y_train_shifted = self.y_train + 1
         tscv = PurgedTimeSeriesSplit(n_splits=3, gap=horizon, embargo_pct=0.01)
         optuna.logging.set_verbosity(optuna.logging.WARNING)
 
@@ -167,21 +189,23 @@ class TrainingManager:
             model = LGBMClassifier(**params)
             scores = []
 
-            for train_idx, val_idx in tscv.split(X_train):
-                model.fit(X_train[train_idx], y_train_shifted.iloc[train_idx])
-                preds = model.predict(X_train[val_idx]) - 1
+            for train_idx, val_idx in tscv.split(self.X_train):
+                model.fit(self.X_train[train_idx], y_train_shifted.iloc[train_idx])
+                preds = model.predict(self.X_train[val_idx]) - 1
 
                 # Penalize models that take zero trades to close the safe haven loophole
                 if np.all(preds == 0):
-                    sharpe = -1.0
+                    local_sharpe = -1.0
                 else:
-                    # Optimize for Sharpe Ratio, not raw accuracy
-                    _, sharpe, _ = self.evaluate_performance(interval, y_train.iloc[val_idx].values, preds, actual_returns_train[val_idx])
-                scores.append(sharpe)
+                    # Optimize for Sharpe Ratio
+                    _, local_sharpe, _ = self.evaluate_performance(
+                        interval, self.y_train.iloc[val_idx].values, preds, self.returns_train[val_idx]
+                    )
+                scores.append(local_sharpe)
             return np.mean(scores)
 
         study = optuna.create_study(direction="maximize")
-        study.optimize(objective, n_trials=30)
+        study.optimize(objective, n_trials=30) # noqa
 
         best_params = study.best_params.copy()
         best_params.update({
@@ -191,31 +215,16 @@ class TrainingManager:
         })
 
         best_model = LGBMClassifier(**best_params)
-        best_model.fit(X_train, y_train_shifted)
+        best_model.fit(self.X_train, y_train_shifted)
 
-        test_preds = best_model.predict(X_test) - 1
+        test_preds = best_model.predict(self.X_test) - 1
 
-        print(
-            "Long:",
-            np.mean(test_preds == 1)
-        )
+        print("Long:", np.mean(test_preds == 1))    # noqa
+        print("Short:", np.mean(test_preds == -1))  # noqa
+        print("Hold:", np.mean(test_preds == 0))    # noqa
+        print(confusion_matrix(self.y_test, test_preds))
 
-        print(
-            "Short:",
-            np.mean(test_preds == -1)
-        )
-
-        print(
-            "Hold:",
-            np.mean(test_preds == 0)
-        )
-
-        print(
-            confusion_matrix(y_test, test_preds)
-        )
-
-        accuracy, sharpe, stability = self.evaluate_performance(interval, y_test.values, test_preds, actual_returns_test)
-
+        accuracy, sharpe, stability = self.evaluate_performance(interval, self.y_test.values, test_preds, self.returns_test)
         return {
             'model_type': 'LGBM',
             'accuracy': accuracy,
@@ -226,9 +235,8 @@ class TrainingManager:
         }
 
     # Train and tune CatBoost with walk-forward validation
-    def _train_catboost(self, interval: str, horizon: int, X_train: np.ndarray, y_train: pd.Series, X_test: np.ndarray, y_test: pd.Series, actual_returns_train: np.ndarray, actual_returns_test: np.ndarray) -> dict:
-        y_train_shifted = y_train + 1
-        # Use our custom Purged & Embargoed split for accurate financial evaluation
+    def _train_catboost(self, interval: str, horizon: int) -> dict:
+        y_train_shifted = self.y_train + 1
         tscv = PurgedTimeSeriesSplit(n_splits=3, gap=horizon, embargo_pct=0.01)
         optuna.logging.set_verbosity(optuna.logging.WARNING)
 
@@ -250,24 +258,26 @@ class TrainingManager:
             model = CatBoostClassifier(**params)
             scores = []
 
-            for train_idx, val_idx in tscv.split(X_train):
+            for train_idx, val_idx in tscv.split(self.X_train):
                 if y_train_shifted.iloc[train_idx].nunique() <= 1:
-                    sharpe = -1.0
+                    local_sharpe = -1.0
                 else:
-                    model.fit(X_train[train_idx], y_train_shifted.iloc[train_idx])
-                    preds = model.predict(X_train[val_idx]).flatten() - 1
+                    model.fit(self.X_train[train_idx], y_train_shifted.iloc[train_idx])
+                    preds = model.predict(self.X_train[val_idx]).flatten() - 1
 
                     # Penalize models that take zero trades to close the safe haven loophole
                     if np.all(preds == 0):
-                        sharpe = -1.0
+                        local_sharpe = -1.0
                     else:
                         # Optimize for Sharpe Ratio
-                        _, sharpe, _ = self.evaluate_performance(interval, y_train.iloc[val_idx].values, preds, actual_returns_train[val_idx])
-                scores.append(sharpe)
+                        _, local_sharpe, _ = self.evaluate_performance(
+                            interval, self.y_train.iloc[val_idx].values, preds, self.returns_train[val_idx]
+                        )
+                scores.append(local_sharpe)
             return np.mean(scores)
 
         study = optuna.create_study(direction="maximize")
-        study.optimize(objective, n_trials=30)
+        study.optimize(objective, n_trials=30) # noqa
 
         best_params = study.best_params.copy()
         best_params.update({
@@ -278,33 +288,18 @@ class TrainingManager:
         # Safeguard final training if the entire dataset contains only one class
         if y_train_shifted.nunique() <= 1:
             unique_val = y_train_shifted.iloc[0]
-            test_preds = np.full(len(X_test), unique_val - 1)
+            test_preds = np.full(len(self.X_test), unique_val - 1)
         else:
             best_model = CatBoostClassifier(**best_params)
-            best_model.fit(X_train, y_train_shifted)
-            test_preds = best_model.predict(X_test).flatten() - 1
+            best_model.fit(self.X_train, y_train_shifted)
+            test_preds = best_model.predict(self.X_test).flatten() - 1
 
-        print(
-            "Long:",
-            np.mean(test_preds == 1)
-        )
+        print("Long:", np.mean(test_preds == 1))    # noqa
+        print("Short:", np.mean(test_preds == -1))  # noqa
+        print("Hold:", np.mean(test_preds == 0))    # noqa
+        print(confusion_matrix(self.y_test, test_preds))
 
-        print(
-            "Short:",
-            np.mean(test_preds == -1)
-        )
-
-        print(
-            "Hold:",
-            np.mean(test_preds == 0)
-        )
-
-        print(
-            confusion_matrix(y_test, test_preds)
-        )
-
-        accuracy, sharpe, stability = self.evaluate_performance(interval, y_test.values, test_preds, actual_returns_test)
-
+        accuracy, sharpe, stability = self.evaluate_performance(interval, self.y_test.values, test_preds, self.returns_test)
         return {
             'model_type': 'CAT',
             'accuracy': accuracy,
@@ -315,17 +310,22 @@ class TrainingManager:
         }
 
     # Train and tune LSTM with walk-forward validation
-    def _train_lstm(self, interval: str, horizon: int, X_train: np.ndarray, y_train: pd.Series, X_test: np.ndarray, y_test: pd.Series, actual_returns_train: np.ndarray, actual_returns_test: np.ndarray) -> dict:
+    def _train_lstm(self, interval: str, horizon: int) -> dict:
         window = 30
-        X_test_padded = np.vstack((X_train[-window:], X_test))
-        y_test_padded = np.concatenate((y_train.values[-window:], y_test.values))
+        X_test_padded = np.vstack((self.X_train[-window:], self.X_test))
+        y_test_padded = np.concatenate((self.y_train.values[-window:], self.y_test.values))
 
-        x_train_3d, y_train_seq = self.create_3d_sequences(X_train, y_train.values, window=window)
+        x_train_3d, y_train_seq = self.create_3d_sequences(self.X_train, self.y_train.values, window=window)
         x_test_3d, y_test_seq = self.create_3d_sequences(X_test_padded, y_test_padded, window=window)
 
         y_train_shifted = (y_train_seq + 1).astype(np.int64)
-        returns_train_seq = actual_returns_train[window:]
+        returns_train_seq = self.returns_train[window:]
         input_dim = x_train_3d.shape[2]
+
+        # Calculate exact class weights to prevent the LSTM from ignoring minority classes
+        classes = np.unique(y_train_shifted)
+        weights = compute_class_weight('balanced', classes=classes, y=y_train_shifted)
+        weight_tensor = torch.tensor(weights, dtype=torch.float).to('cuda' if torch.cuda.is_available() else 'cpu')
 
         # Use our custom Purged & Embargoed split for accurate financial evaluation
         tscv = PurgedTimeSeriesSplit(n_splits=2, gap=window+horizon, embargo_pct=0.01)
@@ -341,7 +341,7 @@ class TrainingManager:
             batch_size = trial.suggest_categorical('batch_size', [16, 32, 64])
             optimizer_name = trial.suggest_categorical('optimizer_name', ["Adam", "AdamW", "RMSprop"])
 
-            optimizers = {"Adam": torch.optim.Adam, "AdamW": torch.optim.AdamW, "RMSprop": torch.optim.RMSprop}
+            optimizers = {"Adam": torch.optim.Adam, "AdamW": torch.optim.AdamW, "RMSprop": torch.optim.RMSprop} # noqa
 
             def build_model():
                 return NeuralNetClassifier(
@@ -352,6 +352,7 @@ class TrainingManager:
                     module__dropout=dropout,
                     module__output_dim=3,
                     criterion=nn.CrossEntropyLoss,
+                    criterion__weight=weight_tensor,
                     optimizer=optimizers[optimizer_name],
                     optimizer__weight_decay=weight_decay,
                     lr=lr,
@@ -372,26 +373,28 @@ class TrainingManager:
 
                 # Penalize models that take zero trades to close the safe haven loophole
                 if np.all(preds == 0):
-                    sharpe = -1.0
+                    local_sharpe = -1.0
                 else:
                     # Optimize for Sharpe Ratio
-                    _, sharpe, _ = self.evaluate_performance(interval, y_train_seq[val_idx], preds, returns_train_seq[val_idx])
-                scores.append(sharpe)
+                    _, local_sharpe, _ = self.evaluate_performance(
+                        interval, y_train_seq[val_idx], preds, returns_train_seq[val_idx]
+                    )
+                scores.append(local_sharpe)
             return np.mean(scores)
 
         study = optuna.create_study(direction="maximize")
-        study.optimize(objective, n_trials=10)
+        study.optimize(objective, n_trials=10) # noqa
 
         best_params = study.best_params.copy()
         opt_name = best_params.pop('optimizer_name')
         optimizers = {"Adam": torch.optim.Adam, "AdamW": torch.optim.AdamW, "RMSprop": torch.optim.RMSprop}
 
-        # Keep training setup identical to walk-forward tuning environment
         final_model = NeuralNetClassifier(
             LSTMBrain,
             module__input_dim=input_dim,
             module__output_dim=3,
             criterion=nn.CrossEntropyLoss,
+            criterion__weight=weight_tensor,
             optimizer=optimizers[opt_name],
             train_split=None,
             iterator_train__shuffle=False,
@@ -403,26 +406,12 @@ class TrainingManager:
         final_model.fit(x_train_3d, y_train_shifted)
         test_preds = final_model.predict(x_test_3d) - 1
 
-        print(
-            "Long:",
-            np.mean(test_preds == 1)
-        )
+        print("Long:", np.mean(test_preds == 1))    # noqa
+        print("Short:", np.mean(test_preds == -1))  # noqa
+        print("Hold:", np.mean(test_preds == 0))    # noqa
+        print(confusion_matrix(self.y_test, test_preds))
 
-        print(
-            "Short:",
-            np.mean(test_preds == -1)
-        )
-
-        print(
-            "Hold:",
-            np.mean(test_preds == 0)
-        )
-
-        print(
-            confusion_matrix(y_test, test_preds)
-        )
-
-        accuracy, sharpe, stability = self.evaluate_performance(interval, y_test_seq, test_preds, actual_returns_test)
+        accuracy, sharpe, stability = self.evaluate_performance(interval, y_test_seq, test_preds, self.returns_test)
 
         best_params['optimizer_name'] = opt_name
         return {
@@ -448,36 +437,23 @@ class TrainingManager:
             return False
 
         print("Scaling features...")
-        drop_cols = ['Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume', 'MA_200', 'return', 'target_profit', 'tbm_return']
-        feature_cols = [c for c in df.columns if c not in drop_cols]
-
-        split_idx = int(len(df) * (1 - self.__test_size))
-        train_df = df[:split_idx].ind.add_indicators(interval, include_indicators=False, include_targets=True)
-        test_df  = df[split_idx:].ind.add_indicators(interval, include_indicators=False, include_targets=True)
-
-        X_train_raw = train_df[feature_cols].values
-        X_test_raw  =  test_df[feature_cols].values
-
-        y_train = train_df['target_profit']
-        y_test  =  test_df['target_profit']
-
-        actual_returns_train = train_df['tbm_return'].values
-        actual_returns_test  =  test_df['tbm_return'].values
-
-        scaler = StandardScaler()
-        X_train = scaler.fit_transform(X_train_raw)
-        X_test  = scaler.transform(X_test_raw)
+        self._prepare_data(df)
 
         results = {}
-
         print("Tuning LightGBM...")
-        lgbm_res = self._train_lightgbm(interval, horizon, X_train, y_train, X_test, y_test, actual_returns_train, actual_returns_test)
+        lgbm_res = self._train_lightgbm(interval, horizon)
+        with open(f"results_{interval}_lgbm.json", "w") as f:
+            json.dump(lgbm_res, f, indent=4)
 
         print("Tuning CatBoost...")
-        cat_res  = self._train_catboost(interval, horizon, X_train, y_train, X_test, y_test, actual_returns_train, actual_returns_test)
+        cat_res  = self._train_catboost(interval, horizon)
+        with open(f"results_{interval}_cat.json", "w") as f:
+            json.dump(cat_res, f, indent=4)
 
         print("Tuning LSTM...")
-        lstm_res = self._train_lstm    (interval, horizon, X_train, y_train, X_test, y_test, actual_returns_train, actual_returns_test)
+        lstm_res = self._train_lstm    (interval, horizon)
+        with open(f"results_{interval}_lstm.json", "w") as f:
+            json.dump(lstm_res, f, indent=4)
 
         results[horizon] = [lgbm_res, cat_res, lstm_res]
 

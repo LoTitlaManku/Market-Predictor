@@ -12,19 +12,17 @@ class TechnicalAnalysisAccessor:
     def __init__(self, pandas_obj: pd.DataFrame):
         self._obj = pandas_obj
 
-    def add_indicators(self, interval: str, horizon: int = 4, include_indicators: bool = True, include_targets: bool = False) -> pd.DataFrame:
+    def add_indicators(self, interval: str, horizon: int = 4) -> pd.DataFrame:
         df = self._obj
         df.index = df.index.astype('datetime64[ms]')
 
         # Add all indicators
-        if include_indicators:
-            df = self._add_sentiment(df)
-            df = self._add_technical_indicators(df)
-            df = self._add_vix(df, interval)
-            df = self._add_vix_plus(df, interval)
-            df = self._add_macro_context(df, interval)
-        if include_targets:
-            df = self._add_targets(df, horizon)
+        df = self._add_sentiment(df)
+        df = self._add_technical_indicators(df)
+        df = self._add_vix(df, interval)
+        df = self._add_vix_plus(df, interval)
+        df = self._add_macro_context(df, interval)
+        df = self._add_targets(df, interval, horizon)
 
         # TEMP FILE
         # df.to_csv("temp_df.csv", index=True)
@@ -149,17 +147,22 @@ class TechnicalAnalysisAccessor:
         return df
 
     @staticmethod
-    def _add_targets(df: pd.DataFrame, horizon: int) -> pd.DataFrame:
+    def _add_targets(df: pd.DataFrame, interval: str, horizon: int) -> pd.DataFrame:
         if horizon <= 0:
             raise ValueError("horizon must be a positive integer")
 
         # Calculate future returns over the given horizon window
         tbm_returns = (df['Adj Close'].shift(-horizon) / df['Adj Close']) - 1
 
-        # Determine dynamic quantile thresholds to guarantee class balance
-        # Top 20% will be longs, bottom 20% will be shorts, middle 60% will be holds
-        upper_barrier = tbm_returns.quantile(0.80)
-        lower_barrier = tbm_returns.quantile(0.20)
+        # Use a rolling window of PAST realized returns to define the barriers (No lookahead bias)
+        if interval == "1d": bars = 252
+        elif interval == "1h": bars = 1638
+        else: raise NotImplementedError("interval not implemented yet.")
+
+        historical_returns = df['Adj Close'].pct_change(horizon)
+
+        upper_barrier = historical_returns.rolling(window=bars, min_periods=30).quantile(0.80)
+        lower_barrier = historical_returns.rolling(window=bars, min_periods=30).quantile(0.20)
 
         labels = np.zeros(len(df))
 
@@ -170,7 +173,11 @@ class TechnicalAnalysisAccessor:
         df['target_profit'] = labels.astype(int)
         df['tbm_return'] = tbm_returns.fillna(0)
 
-        return df.iloc[:-horizon]
+        # Filter out rows where rolling barriers are not yet calculated or future horizon is missing
+        df = df.iloc[:-horizon]
+        valid_idx = upper_barrier.dropna().index.intersection(df.index)
+
+        return df.loc[valid_idx]
 
     @staticmethod
     def _add_vix(df: pd.DataFrame, interval: str):
