@@ -1,112 +1,460 @@
 {
     "1d": {
-        "4": {
+        "1": {
             "LGBM": {
-                "accuracy": 0.5125382262996941,
-                "walk_forward_sharpe": 0.597872976197981,
-                "sharpe": 1.0752320254931356,
-                "stability": 0.9262171110286591,
+                "model_type": "LGBM",
+                "accuracy": 0.5213936430317848,
+                "wf_sharpe": 0.4817787502599682,
+                "sharpe": 0.4463833666257651,
+                "stability": 0.7995370516072811,
                 "best_params": {
-                    "n_estimators": 226,
-                    "learning_rate": 0.0014942272506014763,
-                    "max_depth": 10,
-                    "num_leaves": 230,
-                    "min_child_samples": 21,
-                    "subsample": 0.7732673361164916,
-                    "colsample_bytree": 0.45752798793185034,
-                    "reg_alpha": 1.0873265530410306e-07,
-                    "reg_lambda": 3.014630773556875e-08,
+                    "n_estimators": 527,
+                    "learning_rate": 0.002861195724214647,
+                    "max_depth": 7,
+                    "num_leaves": 169,
+                    "min_child_samples": 99,
+                    "subsample": 0.6682870180655982,
+                    "colsample_bytree": 0.41103473308924066,
+                    "reg_alpha": 1.2888127744668996e-06,
+                    "reg_lambda": 0.0003300772417950808,
                     "objective": "multiclass",
                     "num_class": 3,
-                    "class_weight": "balanced"
+                    "class_weight": "balanced",
                 }
             },
             "CAT": {
-                "accuracy": 0.6067278287461774,
-                "walk_forward_sharpe": 0.6722932721381584,
-                "sharpe": 0.6599749861047561,
-                "stability": 0.6892066239255973,
+                "model_type": "CAT",
+                "accuracy": 0.5568459657701712,
+                "wf_sharpe": 0.5767029882962492,
+                "sharpe": 0.13697773577382463,
+                "stability": 0.2044722363084482,
                 "best_params": {
-                    "iterations": 509,
-                    "learning_rate": 0.09569925285352207,
-                    "depth": 9,
-                    "l2_leaf_reg": 0.02135687398373427,
-                    "random_strength": 7.374755954987766e-07,
-                    "bagging_temperature": 0.23232876400043762,
+                    "iterations": 171,
+                    "learning_rate": 0.010109384464369271,
+                    "depth": 8,
+                    "l2_leaf_reg": 0.0009146455589145752,
+                    "random_strength": 9.202511677153058,
+                    "bagging_temperature": 0.67371251916518,
                     "loss_function": "MultiClass",
-                    "auto_class_weights": "Balanced"
+                    "auto_class_weights": "Balanced",
                 }
             },
             "LSTM": {
-                "accuracy": 0.5963302752293578,
-                "walk_forward_sharpe": 0.9023692912111146,
-                "sharpe": 1.4692243531649465,
-                "stability": 0.9555272069135199,
+                "model_type": "LSTM",
+                "accuracy": 0.4407090464547677,
+                "wf_sharpe": 0.40557675586452724,
+                "sharpe": 0.17551607371216457,
+                "stability": 0.5457522619389554,
                 "best_params": {
-                    "lr": 0.007256498500152447,
-                    "module__hidden_dim": 32,
+                    "lr": 0.0031200459100948646,
+                    "module__hidden_dim": 128,
                     "module__num_layers": 3,
-                    "module__dropout": 0.18671125889957776,
-                    "optimizer__weight_decay": 0.0013962512950647069,
-                    "max_epochs": 27,
-                    "batch_size": 16,
+                    "module__dropout": 0.35548959828323035,
+                    "optimizer__weight_decay": 0.00023409660261818573,
+                    "max_epochs": 50,
+                    "batch_size": 32,
                     "optimizer_name": "RMSprop"
+                }
+            }
+        },
+        "4": {
+            "LGBM": {
+                "model_type": "LGBM",
+                "accuracy": 0.48256880733944957,
+                "wf_sharpe": 0.6201643869878479,
+                "sharpe": 1.0321197312180534,
+                "stability": 0.868526395789966,
+                "best_params": {
+                    "n_estimators": 722,
+                    "learning_rate": 0.0004505848814012252,
+                    "max_depth": 10,
+                    "num_leaves": 114,
+                    "min_child_samples": 85,
+                    "subsample": 0.9372266753998824,
+                    "colsample_bytree": 0.4898277206522378,
+                    "reg_alpha": 0.001978208820982016,
+                    "reg_lambda": 0.0004029208178018687,
+                    "objective": "multiclass",
+                    "num_class": 3,
+                    "class_weight": "balanced",
+                }
+            },
+            "CAT": {
+                "model_type": "CAT",
+                "accuracy": 0.6067278287461774,
+                "wf_sharpe": 0.535644812041243,
+                "sharpe": 0.9376305850816338,
+                "stability": 0.763542482451298,
+                "best_params": {
+                    "iterations": 827,
+                    "learning_rate": 0.02537571631034566,
+                    "depth": 9,
+                    "l2_leaf_reg": 0.0010976004259198977,
+                    "random_strength": 1.432707749718444e-09,
+                    "bagging_temperature": 0.7954417499856705,
+                    "loss_function": "MultiClass",
+                    "auto_class_weights": "Balanced",
+                }
+            },
+            "LSTM": {
+                "model_type": "LSTM",
+                "accuracy": 0.41162079510703364,
+                "wf_sharpe": 0.5860818847239034,
+                "sharpe": 0.34182453447343314,
+                "stability": 0.04002845891185138,
+                "best_params": {
+                    "lr": 0.00012420894377645575,
+                    "module__hidden_dim": 128,
+                    "module__num_layers": 1,
+                    "module__dropout": 0.390406535914282,
+                    "optimizer__weight_decay": 1.8002450582532964e-06,
+                    "max_epochs": 21,
+                    "batch_size": 64,
+                    "optimizer_name": "RMSprop"
+                }
+            }
+        },
+        "10": {
+            "LGBM": {
+                "model_type": "LGBM",
+                "accuracy": 0.4467564259485924,
+                "wf_sharpe": 0.8171754269956629,
+                "sharpe": 0.9874745904419214,
+                "stability": 0.6790344405452586,
+                "best_params": {
+                    "n_estimators": 731,
+                    "learning_rate": 0.08717224663768891,
+                    "max_depth": 8,
+                    "num_leaves": 195,
+                    "min_child_samples": 100,
+                    "subsample": 0.6291148998681296,
+                    "colsample_bytree": 0.8218271443548321,
+                    "reg_alpha": 0.00024298043124384446,
+                    "reg_lambda": 0.018947864215173513,
+                    "objective": "multiclass",
+                    "num_class": 3,
+                    "class_weight": "balanced",
+                }
+            },
+            "CAT": {
+                "model_type": "CAT",
+                "accuracy": 0.40269277845777235,
+                "wf_sharpe": 1.0729638211113992,
+                "sharpe": 0.21452375572696233,
+                "stability": 0.3984995839059949,
+                "best_params": {
+                    "iterations": 226,
+                    "learning_rate": 0.03924163613042044,
+                    "depth": 4,
+                    "l2_leaf_reg": 0.0014066532636469748,
+                    "random_strength": 0.00038756278009771265,
+                    "bagging_temperature": 0.6828253872400678,
+                    "loss_function": "MultiClass",
+                    "auto_class_weights": "Balanced",
+                }
+            },
+            "LSTM": {
+                "model_type": "LSTM",
+                "accuracy": 0.3788249694002448,
+                "wf_sharpe": 0.7557892197363852,
+                "sharpe": -0.8746101323983587,
+                "stability": 0.0,
+                "best_params": {
+                    "lr": 0.0044229763826643224,
+                    "module__hidden_dim": 64,
+                    "module__num_layers": 1,
+                    "module__dropout": 0.29131734132420994,
+                    "optimizer__weight_decay": 0.00014406910707862226,
+                    "max_epochs": 41,
+                    "batch_size": 64,
+                    "optimizer_name": "Adam"
+                }
+            }
+        },
+        "20": {
+            "LGBM": {
+                "model_type": "LGBM",
+                "accuracy": 0.3069852941176471,
+                "wf_sharpe": 0.8983943724045886,
+                "sharpe": -1.4115993838831777,
+                "stability": 0.0,
+                "best_params": {
+                    "n_estimators": 224,
+                    "learning_rate": 0.0003787031910654294,
+                    "max_depth": 6,
+                    "num_leaves": 47,
+                    "min_child_samples": 24,
+                    "subsample": 0.6419823576872855,
+                    "colsample_bytree": 0.7293216679625325,
+                    "reg_alpha": 1.7822168152432686e-05,
+                    "reg_lambda": 3.5926498971780056e-08,
+                    "objective": "multiclass",
+                    "num_class": 3,
+                    "class_weight": "balanced",
+                }
+            },
+            "CAT": {
+                "model_type": "CAT",
+                "accuracy": 0.5361519607843137,
+                "wf_sharpe": 0.698908903283912,
+                "sharpe": 0.7707403675826949,
+                "stability": 0.07018767294171774,
+                "best_params": {
+                    "iterations": 803,
+                    "learning_rate": 0.030665149514140032,
+                    "depth": 9,
+                    "l2_leaf_reg": 0.024496507165622548,
+                    "random_strength": 1.5923553403341646e-05,
+                    "bagging_temperature": 0.8118524206837423,
+                    "loss_function": "MultiClass",
+                    "auto_class_weights": "Balanced",
+                }
+            },
+            "LSTM": {
+                "model_type": "LSTM",
+                "accuracy": 0.43443627450980393,
+                "wf_sharpe": 1.1126112961356194,
+                "sharpe": 0.8018091687142805,
+                "stability": 0.7258196056464696,
+                "best_params": {
+                    "lr": 0.0031319410096796976,
+                    "module__hidden_dim": 32,
+                    "module__num_layers": 1,
+                    "module__dropout": 0.1659401608649002,
+                    "optimizer__weight_decay": 2.3281853249995215e-06,
+                    "max_epochs": 60,
+                    "batch_size": 64,
+                    "optimizer_name": "Adam"
                 }
             }
         }
     },
     "1h": {
-        "4": {
+        "1": {
             "LGBM": {
-                "accuracy": 0.425531914893617,
-                "walk_forward_sharpe": 2.545916114393575,
-                "sharpe": 2.2677811001507666,
-                "stability": 0.47998280523413867,
+                "model_type": "LGBM",
+                "accuracy": 0.47875354107648727,
+                "wf_sharpe": 1.6126579038575048,
+                "sharpe": -0.3255757773223574,
+                "stability": 0.0013420830861195564,
                 "best_params": {
-                    "n_estimators": 632,
-                    "learning_rate": 0.0034686405102319017,
-                    "max_depth": 9,
-                    "num_leaves": 38,
-                    "min_child_samples": 93,
-                    "subsample": 0.9511905446977462,
-                    "colsample_bytree": 0.9366656944297626,
-                    "reg_alpha": 9.94264884169334,
-                    "reg_lambda": 8.178812558712538e-07,
+                    "n_estimators": 901,
+                    "learning_rate": 0.005282168866578064,
+                    "max_depth": 5,
+                    "num_leaves": 26,
+                    "min_child_samples": 54,
+                    "subsample": 0.9981015853446537,
+                    "colsample_bytree": 0.7685857876299136,
+                    "reg_alpha": 1.5519319254230635e-05,
+                    "reg_lambda": 1.2050060963906081e-05,
                     "objective": "multiclass",
                     "num_class": 3,
-                    "class_weight": "balanced"
+                    "class_weight": "balanced",
                 }
             },
             "CAT": {
-                "accuracy": 0.5588652482269504,
-                "walk_forward_sharpe": 2.1561693860718516,
-                "sharpe": 2.665317556652997,
-                "stability": 0.8726445781546477,
+                "model_type": "CAT",
+                "accuracy": 0.48583569405099153,
+                "wf_sharpe": 2.112411510485523,
+                "sharpe": 1.4137439340321336,
+                "stability": 0.6318096750600279,
                 "best_params": {
-                    "iterations": 869,
-                    "learning_rate": 0.026307843752920543,
-                    "depth": 9,
-                    "l2_leaf_reg": 0.07105095873573851,
-                    "random_strength": 8.648300122190989,
-                    "bagging_temperature": 0.6813555341709598,
+                    "iterations": 825,
+                    "learning_rate": 0.00010197453810626468,
+                    "depth": 6,
+                    "l2_leaf_reg": 1.1475635464993295,
+                    "random_strength": 7.989479385459395,
+                    "bagging_temperature": 0.2761781732466797,
                     "loss_function": "MultiClass",
-                    "auto_class_weights": "Balanced"
+                    "auto_class_weights": "Balanced",
                 }
             },
             "LSTM": {
-                "accuracy": 0.36879432624113473,
-                "walk_forward_sharpe": 1.1352838927344429,
-                "sharpe": 7.1480293121318,
-                "stability": 0.8129638388435373,
+                "model_type": "LSTM",
+                "accuracy": 0.4773371104815864,
+                "wf_sharpe": 2.1724671125048984,
+                "sharpe": 0.8699099120491623,
+                "stability": 0.4123920660249617,
                 "best_params": {
-                    "lr": 0.000208533213940899,
-                    "module__hidden_dim": 32,
+                    "lr": 0.00017457211903054547,
+                    "module__hidden_dim": 64,
+                    "module__num_layers": 2,
+                    "module__dropout": 0.4480773649276725,
+                    "optimizer__weight_decay": 0.008225597628039948,
+                    "max_epochs": 57,
+                    "batch_size": 16,
+                    "optimizer_name": "RMSprop"
+                }
+            }
+        },
+        "2": {
+            "LGBM": {
+                "model_type": "LGBM",
+                "accuracy": 0.5014164305949008,
+                "wf_sharpe": 1.2788052276136634,
+                "sharpe": 1.0337109370676927,
+                "stability": 0.3946343256826935,
+                "best_params": {
+                    "n_estimators": 859,
+                    "learning_rate": 0.00035262287931788166,
+                    "max_depth": 10,
+                    "num_leaves": 106,
+                    "min_child_samples": 21,
+                    "subsample": 0.576965529906484,
+                    "colsample_bytree": 0.44579131103297437,
+                    "reg_alpha": 5.909849784601535e-06,
+                    "reg_lambda": 1.0864112924518945,
+                    "objective": "multiclass",
+                    "num_class": 3,
+                    "class_weight": "balanced",
+                }
+            },
+            "CAT": {
+                "model_type": "CAT",
+                "accuracy": 0.49291784702549574,
+                "wf_sharpe": 2.087996488569083,
+                "sharpe": 1.086852810920317,
+                "stability": 0.4384307643739292,
+                "best_params": {
+                    "iterations": 525,
+                    "learning_rate": 0.0004860295839294323,
+                    "depth": 10,
+                    "l2_leaf_reg": 5.631802567229042,
+                    "random_strength": 1.7681977431793627,
+                    "bagging_temperature": 0.2562700843977862,
+                    "loss_function": "MultiClass",
+                    "auto_class_weights": "Balanced",
+                }
+            },
+            "LSTM": {
+                "model_type": "LSTM",
+                "accuracy": 0.5424929178470255,
+                "wf_sharpe": 1.6567096262715175,
+                "sharpe": 0.9739625712239532,
+                "stability": 0.05046502677308861,
+                "best_params": {
+                    "lr": 0.002376754248212858,
+                    "module__hidden_dim": 128,
+                    "module__num_layers": 2,
+                    "module__dropout": 0.19453650968610156,
+                    "optimizer__weight_decay": 5.3977393381890656e-05,
+                    "max_epochs": 53,
+                    "batch_size": 16,
+                    "optimizer_name": "RMSprop"
+                }
+            }
+        },
+        "4": {
+            "LGBM": {
+                "model_type": "LGBM",
+                "accuracy": 0.4794326241134752,
+                "wf_sharpe": 2.2919069437720054,
+                "sharpe": -1.5683131722774917,
+                "stability": 0.0,
+                "best_params": {
+                    "n_estimators": 944,
+                    "learning_rate": 0.049350400950353396,
+                    "max_depth": 10,
+                    "num_leaves": 193,
+                    "min_child_samples": 73,
+                    "subsample": 0.8245217261142334,
+                    "colsample_bytree": 0.746755052985948,
+                    "reg_alpha": 5.064921220022319e-06,
+                    "reg_lambda": 9.422048542398773,
+                    "objective": "multiclass",
+                    "num_class": 3,
+                    "class_weight": "balanced",
+                }
+            },
+            "CAT": {
+                "model_type": "CAT",
+                "accuracy": 0.5475177304964539,
+                "wf_sharpe": 1.990695045268409,
+                "sharpe": 1.1889988832488039,
+                "stability": 0.542684754831563,
+                "best_params": {
+                    "iterations": 753,
+                    "learning_rate": 0.033257048981821094,
+                    "depth": 8,
+                    "l2_leaf_reg": 0.00010400749492033981,
+                    "random_strength": 0.7806419884546848,
+                    "bagging_temperature": 0.8544623492822168,
+                    "loss_function": "MultiClass",
+                    "auto_class_weights": "Balanced",
+                }
+            },
+            "LSTM": {
+                "model_type": "LSTM",
+                "accuracy": 0.4368794326241135,
+                "wf_sharpe": 2.8406212576684537,
+                "sharpe": 3.3779372968218637,
+                "stability": 0.1872910007347835,
+                "best_params": {
+                    "lr": 0.002773931237649782,
+                    "module__hidden_dim": 128,
+                    "module__num_layers": 3,
+                    "module__dropout": 0.47043182387803595,
+                    "optimizer__weight_decay": 0.0041657751536461115,
+                    "max_epochs": 54,
+                    "batch_size": 16,
+                    "optimizer_name": "Adam"
+                }
+            }
+        },
+        "8": {
+            "LGBM": {
+                "model_type": "LGBM",
+                "accuracy": 0.3971631205673759,
+                "wf_sharpe": 4.042902485634113,
+                "sharpe": -2.0883427060471047,
+                "stability": 0.0,
+                "best_params": {
+                    "n_estimators": 530,
+                    "learning_rate": 0.001147072501654127,
+                    "max_depth": 3,
+                    "num_leaves": 153,
+                    "min_child_samples": 87,
+                    "subsample": 0.6243781849758432,
+                    "colsample_bytree": 0.9908727293020111,
+                    "reg_alpha": 0.023067489582203688,
+                    "reg_lambda": 6.747632314362143e-05,
+                    "objective": "multiclass",
+                    "num_class": 3,
+                    "class_weight": "balanced",
+                }
+            },
+            "CAT": {
+                "model_type": "CAT",
+                "accuracy": 0.4624113475177305,
+                "wf_sharpe": 1.5453448984791498,
+                "sharpe": 2.567843397908673,
+                "stability": 0.3797854717211242,
+                "best_params": {
+                    "iterations": 254,
+                    "learning_rate": 0.0002804610201723184,
+                    "depth": 9,
+                    "l2_leaf_reg": 0.00012816838114660693,
+                    "random_strength": 7.718864821217508e-05,
+                    "bagging_temperature": 0.1624452578031882,
+                    "loss_function": "MultiClass",
+                    "auto_class_weights": "Balanced",
+                }
+            },
+            "LSTM": {
+                "model_type": "LSTM",
+                "accuracy": 0.4978723404255319,
+                "wf_sharpe": 2.0133656861290783,
+                "sharpe": 1.2614199175356973,
+                "stability": 0.21779515276139363,
+                "best_params": {
+                    "lr": 0.008177876131839389,
+                    "module__hidden_dim": 128,
                     "module__num_layers": 1,
-                    "module__dropout": 0.15284724798261867,
-                    "optimizer__weight_decay": 3.9544411768299924e-05,
-                    "max_epochs": 41,
-                    "batch_size": 32,
-                    "optimizer_name": "AdamW"
+                    "module__dropout": 0.2580824449341764,
+                    "optimizer__weight_decay": 6.7788264682344935e-06,
+                    "max_epochs": 53,
+                    "batch_size": 16,
+                    "optimizer_name": "Adam"
                 }
             }
         }

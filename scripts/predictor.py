@@ -203,8 +203,6 @@ class TrainingManager:
                 )
             scores.append(local_sharpe)
 
-
-
         # Retrain on full training set, then evaluate on the held-out test set
         model.fit(self.X_train, y_train_shifted)
         test_preds = model.predict(self.X_test) - 1  # Shift back to {-1,0,1} for evaluation
@@ -219,11 +217,6 @@ class TrainingManager:
 
     def _train_catboost(self, interval: str, horizon: int, hyperparams: dict) -> dict:
         cat_params = hyperparams["CAT"]["best_params"]
-        # if Settings.GPU:
-        #     cat_params["task_type"] = "GPU"
-        # if Settings.Threaded:
-        #     cat_params.update({"num_threads": -1, "n_jobs": -1})
-
         model = CatBoostClassifier(
             random_state=self.seed,
             verbose=False,
@@ -423,12 +416,11 @@ class TrainingManager:
                 log_update(f"Insufficient processed data for {ticker} ({interval}) — need 300+, got {len(df)}", True)
                 return False
 
-            log_update("Scaling features...")
+            log_update("Preparing features...")
             self._prepare_data(df)
-
             horizon_hypers = hypers[str(horizon)]
-
             results[horizon] = {}
+
             print("Tuning LightGBM...")
             results[horizon]["LGBM"] = self._train_lightgbm(interval, horizon, horizon_hypers)
             flush_memory()
