@@ -217,7 +217,7 @@ class TrainingManager:
         best_params.update({
             'objective': 'multiclass', 'num_class': 3,
             'class_weight': 'balanced', 'random_state': self.seed,
-            'verbose': -1, 'device_type': 'gpu' if settings.GPU else "cpu"
+            'verbose': -1, 'device_type': 'gpu' if Settings.GPU else "cpu"
         })
 
         best_model = LGBMClassifier(**best_params)
