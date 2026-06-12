@@ -31,6 +31,7 @@ import scripts.indicators_tuning # noqa
 
 class Settings:
     VERBOSE = 1 # Set whether to display logging or not
+    GPU     = True
 
 def flush_memory():
     gc.collect()
@@ -188,7 +189,7 @@ class TrainingManager:
                 'class_weight': 'balanced',
                 'verbose': -1,
                 'n_jobs': -1,  # Maximize local CPU efficiency
-                'device_type': 'gpu'
+                'device_type': 'gpu' if Settings.GPU else "cpu"
             }
 
             model = LGBMClassifier(**params)
@@ -216,7 +217,7 @@ class TrainingManager:
         best_params.update({
             'objective': 'multiclass', 'num_class': 3,
             'class_weight': 'balanced', 'random_state': self.seed,
-            'verbose': -1, 'device_type': 'gpu'
+            'verbose': -1, 'device_type': 'gpu' if settings.GPU else "cpu"
         })
 
         best_model = LGBMClassifier(**best_params)
