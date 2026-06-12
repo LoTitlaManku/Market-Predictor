@@ -12,19 +12,18 @@ class TechnicalAnalysisAccessor:
     def __init__(self, pandas_obj: pd.DataFrame):
         self._obj = pandas_obj
 
-    def add_indicators(self, ticker: str, interval: str, horizon: int = 4, include_targets: bool = True) -> pd.DataFrame:
+    def add_indicators(self, ticker: str, interval: str, horizon: int = 4) -> pd.DataFrame:
         df = self._obj
         df.index = df.index.astype('datetime64[ms]')
 
         # Add all indicators
         df = self._add_sentiment(df, ticker)
         df = self._add_technical_indicators(df)
-        if include_targets:
-            df = self._add_targets(df, horizon)
         df = self._add_vix(df, interval)
         df = self._add_spy(df, interval)
         df = self._add_vix_plus(df, interval)
         df = self._add_macro_context(df, interval)
+        df = self._add_targets(df, interval, horizon)
 
         # TEMP FILE
         # df.to_csv("temp_df.csv", index=True)
@@ -146,46 +145,37 @@ class TechnicalAnalysisAccessor:
         return df
 
     @staticmethod
-    def _add_targets(df: pd.DataFrame, horizon: int) -> pd.DataFrame:
+    def _add_targets(df: pd.DataFrame, interval: str, horizon: int) -> pd.DataFrame:
         if horizon <= 0:
             raise ValueError("horizon must be a positive integer")
 
-        # Extract values to numpy for faster iteration
-        close_prices = df['Adj Close'].values
-        high_prices = df['High'].values
-        low_prices = df['Low'].values
-        atr_values = df['ATR'].values
+        # Calculate future returns over the given horizon window
+        tbm_returns = (df['Adj Close'].shift(-horizon) / df['Adj Close']) - 1
+
+        # Use a rolling window of PAST realized returns to define the barriers (No lookahead bias)
+        if interval == "1d": bars = 252
+        elif interval == "1h": bars = 1638
+        else: raise NotImplementedError("interval not implemented yet.")
+
+        historical_returns = df['Adj Close'].pct_change(horizon)
+
+        upper_barrier = historical_returns.rolling(window=bars, min_periods=30).quantile(0.80)
+        lower_barrier = historical_returns.rolling(window=bars, min_periods=30).quantile(0.20)
 
         labels = np.zeros(len(df))
-        tbm_returns = np.zeros(len(df))
 
-        for i in range(len(df) - horizon):
-            start_price = close_prices[i]
-            current_atr = atr_values[i]
-
-            upper_barrier = start_price + (current_atr * 1.5)
-            lower_barrier = start_price - (current_atr * 1.0)
-
-            labels[i] = 0
-            tbm_returns[i] = (close_prices[i + horizon] - start_price) / start_price
-
-            # Scan the future window
-            for j in range(1, horizon + 1):
-                # Check Stop Loss (Pessimistic: check first)
-                if low_prices[i + j] <= lower_barrier:
-                    labels[i] = -1
-                    tbm_returns[i] = (lower_barrier - start_price) / start_price
-                    break
-                # Check Profit Target
-                if high_prices[i + j] >= upper_barrier:
-                    labels[i] = 1
-                    tbm_returns[i] = (upper_barrier - start_price) / start_price
-                    break
-
+        # Assign labels based on quantiles
+        labels[tbm_returns >= upper_barrier] = 1
+        labels[tbm_returns <= lower_barrier] = -1
 
         df['target_profit'] = labels.astype(int)
-        df['tbm_return'] = tbm_returns
-        return df.iloc[:-horizon]
+        df['tbm_return'] = tbm_returns.fillna(0)
+
+        # Filter out rows where rolling barriers are not yet calculated or future horizon is missing
+        df = df.iloc[:-horizon]
+        valid_idx = upper_barrier.dropna().index.intersection(df.index)
+
+        return df.loc[valid_idx]
 
     @staticmethod
     def _add_vix(df: pd.DataFrame, interval: str):

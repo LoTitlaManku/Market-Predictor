@@ -19,6 +19,7 @@ import torch.nn as nn
 from skorch import NeuralNetClassifier
 from skorch.callbacks import Callback
 from scipy import stats # noqa
+import gc
 
 # Set environment variables and filters
 warnings.filterwarnings("ignore")
@@ -31,7 +32,7 @@ import scripts.indicators_tuning # noqa
 class Settings:
     VERBOSE = 1 # Set whether to display logging or not
 
-############################################################################
+########################################################################################################################
 
 class LSTMBrain(nn.Module):
     def __init__(self, input_dim: int, hidden_dim: int = 64, num_layers: int = 2, dropout: float = 0.2, output_dim: int = 3):
@@ -411,7 +412,8 @@ class TrainingManager:
         print("Hold:", np.mean(test_preds == 0))    # noqa
         print(confusion_matrix(self.y_test, test_preds))
 
-        accuracy, sharpe, stability = self.evaluate_performance(interval, y_test_seq, test_preds, self.returns_test)
+        returns_test_seq = np.concatenate((self.returns_train[-window:], self.returns_test))[window:]
+        accuracy, sharpe, stability = self.evaluate_performance(interval, y_test_seq, test_preds, returns_test_seq)
 
         best_params['optimizer_name'] = opt_name
         return {
@@ -466,7 +468,7 @@ class TrainingManager:
 if __name__ == "__main__":
     start = time.perf_counter()
     m = TrainingManager()
-    for inter in ["1d", "1h"]:
+    for inter in ["1d"]: #, "1h"]:
         m.run_training_pipeline(inter)
 
     end = time.perf_counter()

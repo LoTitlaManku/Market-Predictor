@@ -18,12 +18,14 @@ from lightgbm import Booster as LGBMBooster
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.preprocessing import StandardScaler
+from sklearn.utils.class_weight import compute_class_weight
 from catboost import CatBoostClassifier
 import torch
 import torch.nn as nn
 from skorch import NeuralNetClassifier, dataset
 from skorch.callbacks import EarlyStopping, EpochScoring
 from safetensors.torch import save_file, load_file
+from scipy import stats # noqa
 
 # Set environment variables and filters
 warnings.filterwarnings("ignore")
@@ -58,14 +60,67 @@ class LSTMBrain(nn.Module):
         out = self.dropout(hn[-1])
         return self.fc(out)
 
+# Custom Purged & Embargoed TimeSeriesSplit for Financial Data
+class PurgedTimeSeriesSplit:
+    def __init__(self, n_splits: int = 4, gap: int = 4, embargo_pct: float = 0.01):
+        self.n_splits = n_splits
+        self.gap = gap
+        self.embargo_pct = embargo_pct
 
+    def split(self, X: np.ndarray):
+        n_samples = len(X)
+        embargo = int(n_samples * self.embargo_pct)
+        test_size = n_samples // (self.n_splits + 1)
+
+        for i in range(self.n_splits):
+            train_end = (i + 1) * test_size - self.gap
+            test_start = (i + 1) * test_size + embargo
+            test_end = test_start + test_size
+
+            if test_end > n_samples:
+                test_end = n_samples
+
+            train_indices = np.arange(0, train_end)
+            test_indices = np.arange(test_start, test_end)
+
+            if len(test_indices) > 0:
+                yield train_indices, test_indices
+
+# Class to control and train models
 class TrainingManager:
     def __init__(self):
         self.seed = 69
         self.__test_size = 0.2
 
+        self.X_train = None
+        self.X_test = None
+        self.y_train = None
+        self.y_test = None
+        self.returns_train = None
+        self.returns_test = None
+        self.feature_cols = None
+        self.scaler = None
+
+    def _prepare_data(self, df: pd.DataFrame):
+        drop_cols = ['Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume', 'MA_200', 'return', 'target_profit', 'tbm_return']
+        self.feature_cols = [c for c in df.columns if c not in drop_cols]
+
+        # Partition the fully processed data
+        split_idx = int(len(df) * (1 - self.__test_size))
+        train_df, test_df = df.iloc[:split_idx], df.iloc[split_idx:]
+
+        X_train_raw = train_df[self.feature_cols].values
+        X_test_raw  =  test_df[self.feature_cols].values
+
+        self.y_train,       self.y_test       = train_df['target_profit'],     test_df['target_profit']
+        self.returns_train, self.returns_test = train_df['tbm_return'].values, test_df['tbm_return'].values
+
+        self.scaler  = StandardScaler()
+        self.X_train = self.scaler.fit_transform(X_train_raw)
+        self.X_test  = self.scaler.transform(X_test_raw)
+
     @staticmethod
-    def evaluate_performance(actual: np.ndarray, predicted: np.ndarray, actual_returns: np.ndarray) -> tuple:
+    def evaluate_performance(interval: str, actual: np.ndarray, predicted: np.ndarray, actual_returns: np.ndarray) -> tuple:
         actual = np.asarray(actual)
         predicted = np.asarray(predicted).reshape(-1)
         actual_returns = np.asarray(actual_returns).reshape(-1)
@@ -85,12 +140,15 @@ class TrainingManager:
         if len(strategy_returns) < 2 or np.std(strategy_returns) == 0:
             sharpe = 0.0
         else:
-            sharpe = np.mean(strategy_returns) / (np.std(strategy_returns) + 1e-9) * np.sqrt(252)
+            if interval == "1d": bars = 252
+            elif interval == "1h": bars = 1638
+            else: raise NotImplementedError("Interval length not implemented yet.")
+
+            sharpe = np.mean(strategy_returns) / (np.std(strategy_returns) + 1e-9) * np.sqrt(bars)
 
         # Calculate stability
         cumulative_returns = np.cumsum(strategy_returns)
         if len(cumulative_returns) > 1:
-            from scipy import stats
             x = np.arange(len(cumulative_returns))
             slope, intercept, r_value, p_value, std_err = stats.linregress(x, cumulative_returns)
             stability = r_value ** 2 if slope > 0 else 0.0
@@ -98,11 +156,6 @@ class TrainingManager:
             stability = 0.0
 
         return acc, sharpe, stability
-
-    def _score_fold(self, model, X_val: np.ndarray, y_val: np.ndarray, returns_val: np.ndarray) -> float:
-        preds = np.asarray(model.predict(X_val)).reshape(-1) - 1
-        accuracy, _, _ = self.evaluate_performance(y_val, preds, returns_val)
-        return accuracy
 
     @staticmethod
     def create_3d_sequences(data: np.ndarray, targets: np.ndarray, window: int = 30) -> tuple:
@@ -112,112 +165,130 @@ class TrainingManager:
             y.append(targets[i + window])
         return np.array(x, dtype=np.float32), np.array(y)
 
-    def _train_lgbm(self, horizon: int, hyperparams: dict, X_train: np.ndarray, y_train: pd.Series, X_test: np.ndarray,  y_test: pd.Series, actual_returns_train: np.ndarray, actual_returns_test: np.ndarray) -> dict:
-        lgbm_params = hyperparams.copy()
-        lgbm_params.update(dict(
-            n_estimators=100,
-            max_depth=5,
-            learning_rate=0.05,
-            objective='multiclass',
-            num_class=3,
-            class_weight='balanced',
-            random_state=self.seed,
-            importance_type='gain',
-            verbose=-1
-        ))
+    def _train_lightgbm(self, interval: str, horizon: int, hyperparams: dict) -> dict:
+        lgbm_params = hyperparams["LGBM"]
         if Settings.GPU:
             lgbm_params.update({"device_type": "gpu", "gpu_platform_id": 0, "gpu_device_id": 0})
         if Settings.Threaded:
-            lgbm_params.update({"num_threads": 1, "n_jobs": 1})
+            lgbm_params.update({"num_threads": -1, "n_jobs": -1})
 
         # LightGBM multiclass requires labels 0-indexed, so shift {-1,0,1} -> {0,1,2}
-        y_train_shifted = y_train + 1
+        y_train_shifted = self.y_train + 1
+        tscv = PurgedTimeSeriesSplit(n_splits=3, gap=horizon, embargo_pct=0.01)
 
-        model = LGBMClassifier(**lgbm_params)
+        model = LGBMClassifier(
+            random_state=self.seed,
+            importance_type='gain',
+            verbose=-1
+            **lgbm_params
+        )
 
-        # Walk-forward validation on training data only (no peeking at test set)
-        time_splitter = TimeSeriesSplit(n_splits=3, gap=horizon)
-        wf_scores = []
-        for train_idx, val_idx in time_splitter.split(X_train):
-            model.fit(X_train[train_idx], y_train_shifted.iloc[train_idx])
-            wf_scores.append(self._score_fold(model, X_train[val_idx], y_train.iloc[val_idx].values, actual_returns_train[val_idx]))
+        # Walk-forward validation on training data only
+        scores = []
+        for train_idx, val_idx in tscv.split(self.X_train):
+            model.fit(self.X_train[train_idx], y_train_shifted.iloc[train_idx])
+            preds = model.predict(self.X_train[val_idx]) - 1
+
+            # Penalize models that take zero trades to close the safe haven loophole
+            if np.all(preds == 0):
+                local_sharpe = -1.0
+            else:
+                # Optimize for Sharpe Ratio
+                _, local_sharpe, _ = self.evaluate_performance(
+                    interval, self.y_train.iloc[val_idx].values, preds, self.returns_train[val_idx]
+                )
+            scores.append(local_sharpe)
+
+
 
         # Retrain on full training set, then evaluate on the held-out test set
-        model.fit(X_train, y_train_shifted)
-        test_preds = model.predict(X_test) - 1  # Shift back to {-1,0,1} for evaluation
+        model.fit(self.X_train, y_train_shifted)
+        test_preds = model.predict(self.X_test) - 1  # Shift back to {-1,0,1} for evaluation
 
-        accuracy, sharpe, stability = self.evaluate_performance(y_test.values, test_preds, actual_returns_test)
-        wf_mean = float(np.mean(wf_scores))
+        accuracy, sharpe, stability = self.evaluate_performance(interval, self.y_test.values, test_preds, self.returns_test)
 
         return {
             'type': 'LGBM', 'model': model,
-            'accuracy': accuracy, 'walk_forward_accuracy': wf_mean,
-            'sharpe': sharpe, 'stability': stability,
+            'accuracy': accuracy, 'stability': stability,
+            'sharpe': sharpe, 'wf_sharpe': float(np.mean(scores)),
         }
 
-    def _train_catboost(self, horizon: int, hyperparams: dict, X_train: np.ndarray, y_train: pd.Series, X_test: np.ndarray,  y_test: pd.Series, actual_returns_train: np.ndarray, actual_returns_test: np.ndarray) -> dict:
-        cat_params = hyperparams.copy()
+    def _train_catboost(self, interval: str, horizon: int, hyperparams: dict) -> dict:
+        cat_params = hyperparams["CAT"]
+        # if Settings.GPU:
+        #     cat_params["task_type"] = "GPU"
+        # if Settings.Threaded:
+        #     cat_params.update({"num_threads": -1, "n_jobs": -1})
+
         model = CatBoostClassifier(
-            iterations=500, # Will change with hyperparameter tuning
-            learning_rate=0.05,
-            depth=6,
-            loss_function='MultiClass',
-            auto_class_weights='Balanced',
-            task_type="GPU" if Settings.GPU else "CPU",
-            verbose=False,
             random_state=self.seed,
+            verbose=False,
             **cat_params
         )
 
-        y_train_shifted = y_train + 1
+        y_train_shifted = self.y_train + 1
 
-        time_splitter = TimeSeriesSplit(n_splits=3, gap=horizon)
-        wf_scores = []
-        for train_idx, val_idx in time_splitter.split(X_train):
-            model.fit(X_train[train_idx], y_train_shifted.iloc[train_idx])
-            wf_scores.append(self._score_fold(model, X_train[val_idx], y_train.iloc[val_idx].values, actual_returns_train[val_idx]))
+        tscv = PurgedTimeSeriesSplit(n_splits=3, gap=horizon, embargo_pct=0.01)
+        scores = []
+        for train_idx, val_idx in tscv.split(self.X_train):
+            if y_train_shifted.iloc[train_idx].nunique() <= 1:
+                local_sharpe = -1.0
+            else:
+                model.fit(self.X_train[train_idx], y_train_shifted.iloc[train_idx])
+                preds = model.predict(self.X_train[val_idx]).flatten() - 1
 
-        model.fit(X_train, y_train_shifted)
-        test_preds = model.predict(X_test).flatten() - 1  # Shift back to {-1,0,1}
+                # Penalize models that take zero trades to close the safe haven loophole
+                if np.all(preds == 0):
+                    local_sharpe = -1.0
+                else:
+                    # Optimize for Sharpe Ratio
+                    _, local_sharpe, _ = self.evaluate_performance(
+                        interval, self.y_train.iloc[val_idx].values, preds, self.returns_train[val_idx]
+                    )
+            scores.append(local_sharpe)
 
-        accuracy, sharpe, stability = self.evaluate_performance(y_test.values, test_preds, actual_returns_test)
-        wf_mean = float(np.mean(wf_scores))
+        model.fit(self.X_train, y_train_shifted)
+        test_preds = model.predict(self.X_test).flatten() - 1  # Shift back to {-1,0,1}
 
+        accuracy, sharpe, stability = self.evaluate_performance(interval, self.y_test.values, test_preds, self.returns_test)
         return {
             'type': 'CAT', 'model': model,
-            'accuracy': accuracy, 'walk_forward_accuracy': wf_mean,
-            'sharpe': sharpe, 'stability': stability,
+            'accuracy': accuracy, 'stability': stability,
+            'sharpe': sharpe, 'wf_sharpe': float(np.mean(scores)),
         }
 
-    def _train_lstm(self, horizon: int, hyperparams: dict, X_train: np.ndarray, y_train: pd.Series, X_test: np.ndarray,  y_test: pd.Series, actual_returns_train: np.ndarray, actual_returns_test: np.ndarray) -> dict:
-        lstm_params = hyperparams.copy()
+    def _train_lstm(self, interval: str, horizon: int, hyperparams: dict) -> dict:
+        lstm_params = hyperparams["LGBM"]
+        if Settings.GPU:
+            lstm_params.update({"device_type": "gpu", "gpu_platform_id": 0, "gpu_device_id": 0})
+        if Settings.Threaded:
+            lstm_params.update({"num_threads": -1, "n_jobs": -1})
 
         window = 30
-        X_test_padded = np.vstack((X_train[-window:], X_test))
-        y_test_padded = np.concatenate((y_train.values[-window:], y_test.values))
+        X_test_padded = np.vstack((self.X_train[-window:], self.X_test))
+        y_test_padded = np.concatenate((self.y_train.values[-window:], self.y_test.values))
 
-        # Build (samples, window, features) sequences from the flat scaled arrays
-        x_train_3d, y_train_seq = self.create_3d_sequences(X_train, y_train.values)
-        x_test_3d,  y_test_seq  = self.create_3d_sequences(X_test_padded, y_test_padded, window=window)
+        x_train_3d, y_train_seq = self.create_3d_sequences(self.X_train, self.y_train.values, window=window)
+        x_test_3d, y_test_seq = self.create_3d_sequences(X_test_padded, y_test_padded, window=window)
 
         # Shift targets to {0,1,2} for CrossEntropyLoss; keep originals for evaluate_performance
         y_train_shifted = (y_train_seq + 1).astype(np.int64)
-        returns_train_seq = actual_returns_train[window:]
-
+        returns_train_seq = self.returns_train[window:]
         input_dim = x_train_3d.shape[2]
+
+        # Calculate exact class weights to prevent the LSTM from ignoring minority classes
+        classes = np.unique(y_train_shifted)
+        weights = compute_class_weight('balanced', classes=classes, y=y_train_shifted)
+        weight_tensor = torch.tensor(weights, dtype=torch.float).to('cuda' if torch.cuda.is_available() else 'cpu')
 
         def build_skorch_model() -> NeuralNetClassifier:
             return NeuralNetClassifier(
                 LSTMBrain,
                 module__input_dim=input_dim,
-                module__hidden_dim=64, # Will change with hyperparameter tuning
-                module__num_layers=2,
-                module__dropout=0.2, # Will change with hyperparameter tuning
                 module__output_dim=3,
                 criterion=nn.CrossEntropyLoss,
-                optimizer=torch.optim.Adam, # Will change with hyperparameter tuning
-                lr=0.001, # Will change with hyperparameter tuning
-                max_epochs=50, # Will change with hyperparameter tuning
+                criterion__weight=weight_tensor,
+                optimizer=torch.optim.Adam,
                 train_split=dataset.ValidSplit(0.2, stratified=False),
                 iterator_train__shuffle=False,
                 device='cuda' if torch.cuda.is_available() else 'cpu',
@@ -234,36 +305,42 @@ class TrainingManager:
                         lower_is_better=False
                     ))
                 ],
-            **lstm_params
+                **lstm_params
             )
 
         # Walk-forward validation across folds of the training sequences
-        time_splitter = TimeSeriesSplit(n_splits=3, gap=horizon)
-        wf_scores = []
-        for train_idx, val_idx in time_splitter.split(x_train_3d):
+        tscv = PurgedTimeSeriesSplit(n_splits=2, gap=window + horizon, embargo_pct=0.01)
+        scores = []
+        for train_idx, val_idx in tscv.split(x_train_3d):
             fold_model = build_skorch_model()
             fold_model.fit(x_train_3d[train_idx], y_train_shifted[train_idx])
-            wf_scores.append(self._score_fold(fold_model, x_train_3d[val_idx], y_train_seq[val_idx], returns_train_seq[val_idx]))
+            preds = fold_model.predict(x_train_3d[val_idx]) - 1
+
+            # Penalize models that take zero trades to close the safe haven loophole
+            if np.all(preds == 0):
+                local_sharpe = -1.0
+            else:
+                # Optimize for Sharpe Ratio
+                _, local_sharpe, _ = self.evaluate_performance(
+                    interval, y_train_seq[val_idx], preds, returns_train_seq[val_idx]
+                )
+            scores.append(local_sharpe)
 
         # Final model trained on all training sequences
         model = build_skorch_model()
         model.fit(x_train_3d, y_train_shifted)
-
-        # Shift predictions back to {-1,0,1} for evaluation
         test_preds = model.predict(x_test_3d) - 1
 
-        # Align returns with the sequence offset (first LSTM_WINDOW bars are consumed as context)
-        accuracy, sharpe, stability = self.evaluate_performance(y_test_seq, test_preds, actual_returns_test)
-        wf_mean = float(np.mean(wf_scores)) if wf_scores else 0.0
+        returns_test_seq = np.concatenate((self.returns_train[-window:], self.returns_test))[window:]
+        accuracy, sharpe, stability = self.evaluate_performance(interval, y_test_seq, test_preds, returns_test_seq)
 
         return {
             'type': 'LSTM', 'model': model,
-            'accuracy': accuracy, 'walk_forward_accuracy': wf_mean,
-            'sharpe': sharpe, 'stability': stability,
+            'accuracy': accuracy, 'stability': stability,
+            'sharpe': sharpe, 'wf_sharpe': float(np.mean(scores)),
         }
 
-    def _save_model_assets(self, ticker: str, interval: str, horizon: int, training_data_end: pd.Timestamp, results: list, feature_columns: list, scaler: StandardScaler) -> None:
-
+    def _save_model_assets(self, ticker: str, interval: str, horizon: int, training_data_end: pd.Timestamp, full_results: dict) -> None:
         save_folder = os.path.join(MODEL_DIR, f"{ticker}_{interval}")
         if not os.path.exists(save_folder): os.makedirs(save_folder)
 
@@ -275,29 +352,29 @@ class TrainingManager:
             "models":             {}
         }
 
-        for result in results:
-            model_type = result['type']
-            model = result['model']
+        for horizon, results in full_results.items():
+            for model_type, model_results in results.items():
+                model = model_results['model']
 
-            metadata["models"][model_type] = {
-                "accuracy":              result['accuracy'],
-                "walk_forward_accuracy": result['walk_forward_accuracy'],
-                "sharpe":                result['sharpe'],
-                "stability":             result['stability'],
-            }
+                metadata["models"][model_type] = {
+                    "accuracy":   model_results['accuracy'],
+                    "sharpe":     model_results['sharpe'],
+                    "wf_sharpe":  model_results['wf_sharpe'],
+                    "stability":  model_results['stability'],
+                }
 
-            if model_type == 'LSTM':
-                save_file(model.module_.state_dict(), os.path.join(save_folder, "lstm_model.safetensors"))
-            elif model_type == 'LGBM':
-                model.booster_.save_model(os.path.join(save_folder, "lgbm_model.txt"))
-            else:
-                joblib.dump(model, os.path.join(save_folder, f"cat_model.joblib"))
+                if model_type == 'LSTM':
+                    save_file(model.module_.state_dict(), os.path.join(save_folder, "lstm_model.safetensors"))
+                elif model_type == 'LGBM':
+                    model.booster_.save_model(os.path.join(save_folder, "lgbm_model.txt"))
+                else:
+                    joblib.dump(model, os.path.join(save_folder, f"cat_model.joblib"))
 
         with open(os.path.join(save_folder, 'metadata.json'), 'w') as f:
             json.dump(metadata, f, indent=4)
 
-        joblib.dump(scaler, os.path.join(save_folder, "scaler.joblib"))
-        joblib.dump(feature_columns, os.path.join(save_folder, "features.joblib"))
+        joblib.dump(self.scaler, os.path.join(save_folder, "scaler.joblib"))
+        joblib.dump(self.feature_cols, os.path.join(save_folder, "features.joblib"))
 
     def run_training_pipeline(self, ticker: str, interval: str, horizon: int = 4, override_data: pd.DataFrame = None, status_signal: tuple = None, force_train: bool = False) -> bool:
         def log_update(msg, force_print=False):
@@ -328,36 +405,23 @@ class TrainingManager:
             return False
 
         log_update("Scaling features...")
-        drop_cols = ['Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume', 'MA_200', 'return', 'target_profit', 'tbm_return']
-        feature_cols = [c for c in df.columns if c not in drop_cols]
+        self._prepare_data(df)
 
-        X, y = df[feature_cols].values, df['target_profit']
+        with open(os.path.join(DATA_DIR, "hyperparams"), "r") as f:
+            hyperparams = json.load(f)
 
-        split_idx = int(len(df) * (1 - self.__test_size))
-        X_train_raw, X_test_raw = X[:split_idx], X[split_idx:]
-        y_train, y_test = y.iloc[:split_idx], y.iloc[split_idx:]
+        results = {horizon: {}}
+        print("Tuning LightGBM...")
+        results[horizon]["LGBM"] = self._train_lightgbm(interval, horizon, hyperparams)
 
-        actual_returns_train = df['tbm_return'].loc[y_train.index].values
-        actual_returns_test = df['tbm_return'].loc[y_test.index].values
-        scaler  = StandardScaler()
-        X_train = scaler.fit_transform(X_train_raw)
-        X_test  = scaler.transform(X_test_raw)
+        print("Tuning CatBoost...")
+        results[horizon]["CAT"]  = self._train_catboost(interval, horizon, hyperparams)
 
-        hyperparams = {}
-
-        log_update("Training LGBM...")
-        lgbm_result = self._train_lgbm(horizon, hyperparams, X_train, y_train, X_test, y_test, actual_returns_train, actual_returns_test)
-
-        log_update("Training CatBoost...")
-        cat_result = self._train_catboost(horizon, hyperparams, X_train, y_train, X_test, y_test, actual_returns_train, actual_returns_test)
-
-        log_update("Training LSTM...")
-        lstm_result = self._train_lstm(horizon, hyperparams, X_train, y_train, X_test, y_test, actual_returns_train, actual_returns_test)
-
-        results = [lgbm_result, cat_result, lstm_result]
+        print("Tuning LSTM...")
+        results[horizon]["LSTM"] = self._train_lstm    (interval, horizon, hyperparams)
 
         log_update("Saving assets...")
-        self._save_model_assets(ticker, interval, horizon, df.index.max(), results, feature_cols, scaler)
+        self._save_model_assets(ticker, interval, horizon, df.index.max(), results)
         return True
 
 ########################################################################################################################
