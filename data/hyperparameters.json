@@ -1,0 +1,114 @@
+{
+    "1d": {
+        "4": {
+            "LGBM": {
+                "accuracy": 0.5125382262996941,
+                "walk_forward_sharpe": 0.597872976197981,
+                "sharpe": 1.0752320254931356,
+                "stability": 0.9262171110286591,
+                "best_params": {
+                    "n_estimators": 226,
+                    "learning_rate": 0.0014942272506014763,
+                    "max_depth": 10,
+                    "num_leaves": 230,
+                    "min_child_samples": 21,
+                    "subsample": 0.7732673361164916,
+                    "colsample_bytree": 0.45752798793185034,
+                    "reg_alpha": 1.0873265530410306e-07,
+                    "reg_lambda": 3.014630773556875e-08,
+                    "objective": "multiclass",
+                    "num_class": 3,
+                    "class_weight": "balanced"
+                }
+            },
+            "CAT": {
+                "accuracy": 0.6067278287461774,
+                "walk_forward_sharpe": 0.6722932721381584,
+                "sharpe": 0.6599749861047561,
+                "stability": 0.6892066239255973,
+                "best_params": {
+                    "iterations": 509,
+                    "learning_rate": 0.09569925285352207,
+                    "depth": 9,
+                    "l2_leaf_reg": 0.02135687398373427,
+                    "random_strength": 7.374755954987766e-07,
+                    "bagging_temperature": 0.23232876400043762,
+                    "loss_function": "MultiClass",
+                    "auto_class_weights": "Balanced"
+                }
+            },
+            "LSTM": {
+                "accuracy": 0.5963302752293578,
+                "walk_forward_sharpe": 0.9023692912111146,
+                "sharpe": 1.4692243531649465,
+                "stability": 0.9555272069135199,
+                "best_params": {
+                    "lr": 0.007256498500152447,
+                    "module__hidden_dim": 32,
+                    "module__num_layers": 3,
+                    "module__dropout": 0.18671125889957776,
+                    "optimizer__weight_decay": 0.0013962512950647069,
+                    "max_epochs": 27,
+                    "batch_size": 16,
+                    "optimizer_name": "RMSprop"
+                }
+            }
+        }
+    },
+    "1h": {
+        "4": {
+            "LGBM": {
+                "accuracy": 0.425531914893617,
+                "walk_forward_sharpe": 2.545916114393575,
+                "sharpe": 2.2677811001507666,
+                "stability": 0.47998280523413867,
+                "best_params": {
+                    "n_estimators": 632,
+                    "learning_rate": 0.0034686405102319017,
+                    "max_depth": 9,
+                    "num_leaves": 38,
+                    "min_child_samples": 93,
+                    "subsample": 0.9511905446977462,
+                    "colsample_bytree": 0.9366656944297626,
+                    "reg_alpha": 9.94264884169334,
+                    "reg_lambda": 8.178812558712538e-07,
+                    "objective": "multiclass",
+                    "num_class": 3,
+                    "class_weight": "balanced"
+                }
+            },
+            "CAT": {
+                "accuracy": 0.5588652482269504,
+                "walk_forward_sharpe": 2.1561693860718516,
+                "sharpe": 2.665317556652997,
+                "stability": 0.8726445781546477,
+                "best_params": {
+                    "iterations": 869,
+                    "learning_rate": 0.026307843752920543,
+                    "depth": 9,
+                    "l2_leaf_reg": 0.07105095873573851,
+                    "random_strength": 8.648300122190989,
+                    "bagging_temperature": 0.6813555341709598,
+                    "loss_function": "MultiClass",
+                    "auto_class_weights": "Balanced"
+                }
+            },
+            "LSTM": {
+                "accuracy": 0.36879432624113473,
+                "walk_forward_sharpe": 1.1352838927344429,
+                "sharpe": 7.1480293121318,
+                "stability": 0.8129638388435373,
+                "best_params": {
+                    "lr": 0.000208533213940899,
+                    "module__hidden_dim": 32,
+                    "module__num_layers": 1,
+                    "module__dropout": 0.15284724798261867,
+                    "optimizer__weight_decay": 3.9544411768299924e-05,
+                    "max_epochs": 41,
+                    "batch_size": 32,
+                    "optimizer_name": "AdamW"
+                }
+            }
+        }
+    }
+}

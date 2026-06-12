@@ -155,7 +155,8 @@ class TechnicalAnalysisAccessor:
         # Use a rolling window of PAST realized returns to define the barriers (No lookahead bias)
         if interval == "1d": bars = 252
         elif interval == "1h": bars = 1638
-        else: raise NotImplementedError("interval not implemented yet.")
+        elif interval == "15m": bars = 6552
+        else: raise ValueError("Invalid interval")
 
         historical_returns = df['Adj Close'].pct_change(horizon)
 

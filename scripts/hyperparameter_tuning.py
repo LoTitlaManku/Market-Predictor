@@ -32,6 +32,10 @@ import scripts.indicators_tuning # noqa
 class Settings:
     VERBOSE = 1 # Set whether to display logging or not
 
+def flush_memory():
+    gc.collect()
+    if torch.cuda.is_available(): torch.cuda.empty_cache()
+
 ########################################################################################################################
 
 class LSTMBrain(nn.Module):
@@ -220,16 +224,16 @@ class TrainingManager:
 
         test_preds = best_model.predict(self.X_test) - 1
 
-        print("Long:", np.mean(test_preds == 1))    # noqa
-        print("Short:", np.mean(test_preds == -1))  # noqa
-        print("Hold:", np.mean(test_preds == 0))    # noqa
-        print(confusion_matrix(self.y_test, test_preds))
+        # print("Long:", np.mean(test_preds == 1))    # noqa
+        # print("Short:", np.mean(test_preds == -1))  # noqa
+        # print("Hold:", np.mean(test_preds == 0))    # noqa
+        # print(confusion_matrix(self.y_test, test_preds))
 
         accuracy, sharpe, stability = self.evaluate_performance(interval, self.y_test.values, test_preds, self.returns_test)
         return {
             'model_type': 'LGBM',
             'accuracy': accuracy,
-            'walk_forward_sharpe': study.best_value,
+            'wf_sharpe': study.best_value,
             'sharpe': sharpe,
             'stability': stability,
             'best_params': best_params
@@ -295,16 +299,16 @@ class TrainingManager:
             best_model.fit(self.X_train, y_train_shifted)
             test_preds = best_model.predict(self.X_test).flatten() - 1
 
-        print("Long:", np.mean(test_preds == 1))    # noqa
-        print("Short:", np.mean(test_preds == -1))  # noqa
-        print("Hold:", np.mean(test_preds == 0))    # noqa
-        print(confusion_matrix(self.y_test, test_preds))
+        # print("Long:", np.mean(test_preds == 1))    # noqa
+        # print("Short:", np.mean(test_preds == -1))  # noqa
+        # print("Hold:", np.mean(test_preds == 0))    # noqa
+        # print(confusion_matrix(self.y_test, test_preds))
 
         accuracy, sharpe, stability = self.evaluate_performance(interval, self.y_test.values, test_preds, self.returns_test)
         return {
             'model_type': 'CAT',
             'accuracy': accuracy,
-            'walk_forward_sharpe': study.best_value,
+            'wf_sharpe': study.best_value,
             'sharpe': sharpe,
             'stability': stability,
             'best_params': best_params
@@ -407,10 +411,10 @@ class TrainingManager:
         final_model.fit(x_train_3d, y_train_shifted)
         test_preds = final_model.predict(x_test_3d) - 1
 
-        print("Long:", np.mean(test_preds == 1))    # noqa
-        print("Short:", np.mean(test_preds == -1))  # noqa
-        print("Hold:", np.mean(test_preds == 0))    # noqa
-        print(confusion_matrix(self.y_test, test_preds))
+        # print("Long:", np.mean(test_preds == 1))    # noqa
+        # print("Short:", np.mean(test_preds == -1))  # noqa
+        # print("Hold:", np.mean(test_preds == 0))    # noqa
+        # print(confusion_matrix(self.y_test, test_preds))
 
         returns_test_seq = np.concatenate((self.returns_train[-window:], self.returns_test))[window:]
         accuracy, sharpe, stability = self.evaluate_performance(interval, y_test_seq, test_preds, returns_test_seq)
@@ -419,7 +423,7 @@ class TrainingManager:
         return {
             'model_type': 'LSTM',
             'accuracy': accuracy,
-            'walk_forward_sharpe': study.best_value,
+            'wf_sharpe': study.best_value,
             'sharpe': sharpe,
             'stability': stability,
             'best_params': best_params
@@ -427,40 +431,46 @@ class TrainingManager:
 
     # Run all helper functions and consolidate the best model
     def run_training_pipeline(self, interval) -> bool:
-        horizon = 4
-
         data = pd.read_parquet(os.path.join(DATA_DIR, f"SPY_{interval}.parquet"))
         if data is None: print("No data"); return False
 
-        print("Adding features...")
-        df = data.ind.add_indicators(interval)
-        if len(df) < 300:
-            print(f"Insufficient data (need 300+, got {len(df)})")
-            return False
+        all_horizons = {
+            "15m": {2: 0.5,  4: 1,  8: 2,    13: 3.25},  # bars: hours
+            "1h":  {1: 1,    2: 2,  4: 4,    8: 25},     # bars: hours
+            "1d":  {1: 1,    4: 4,  10: 14,  20: 28}     # bars: days
+        }
+        horizons = all_horizons[interval]
 
-        print("Scaling features...")
-        self._prepare_data(df)
+        def save():
+            with open(f"results/tuned_results_{interval}.json", "w") as f:
+                json.dump(results, f, indent=4)
 
         results = {}
-        print("Tuning LightGBM...")
-        lgbm_res = self._train_lightgbm(interval, horizon)
-        with open(f"results_{interval}_lgbm.json", "w") as f:
-            json.dump(lgbm_res, f, indent=4)
+        for horizon in horizons.keys():
+            print(f"Adding features ({horizon})...")
+            df = data.ind.add_indicators(interval, horizon)
+            if len(df) < 300:
+                print(f"Insufficient data (need 300+, got {len(df)})")
+                return False
 
-        print("Tuning CatBoost...")
-        cat_res  = self._train_catboost(interval, horizon)
-        with open(f"results_{interval}_cat.json", "w") as f:
-            json.dump(cat_res, f, indent=4)
+            print("Scaling features...")
+            self._prepare_data(df)
+            results[horizon] = {}
 
-        print("Tuning LSTM...")
-        lstm_res = self._train_lstm    (interval, horizon)
-        with open(f"results_{interval}_lstm.json", "w") as f:
-            json.dump(lstm_res, f, indent=4)
+            print("Tuning LightGBM...")
+            results[horizon]["LGBM"] = self._train_lightgbm(interval, horizon)
+            flush_memory()
+            save()
 
-        results[horizon] = [lgbm_res, cat_res, lstm_res]
+            print("Tuning CatBoost...")
+            results[horizon]["CAT"]  = self._train_catboost(interval, horizon)
+            flush_memory()
+            save()
 
-        with open(f"tuned_results_{interval}.json", "w") as f:
-            json.dump(results, f, indent=4)
+            print("Tuning LSTM...")
+            results[horizon]["LSTM"] = self._train_lstm(interval, horizon)
+            flush_memory()
+            save()
 
         return True
 
@@ -468,7 +478,7 @@ class TrainingManager:
 if __name__ == "__main__":
     start = time.perf_counter()
     m = TrainingManager()
-    for inter in ["1d"]: #, "1h"]:
+    for inter in ["1h", "1d"]:
         m.run_training_pipeline(inter)
 
     end = time.perf_counter()
