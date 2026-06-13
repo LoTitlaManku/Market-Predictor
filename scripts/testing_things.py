@@ -226,7 +226,7 @@ def get_spy():
 def get_special(key):
     import pandas as pd
     import os
-    from config import DATA_DIR
+    from config import DATA_DIR, HYPER_DIR
     import yfinance as yf
     from datetime import datetime, timezone
     from data_management import NYSE_CAL
@@ -234,8 +234,8 @@ def get_special(key):
     for interval in ["1h", "1d"]:
         data = yf.download(key, interval=interval, period="max", auto_adjust=False, progress=True)
 
-        if data.empty:
-            print("Empty data")
+        if data.empty or data is None:
+            print(f"Empty data: {key} - {interval}")
             continue
 
         # Flattens columns if MultiIndex
@@ -246,18 +246,18 @@ def get_special(key):
         data.index = pd.to_datetime(data.index, utc=True).tz_localize(None)
         data.index.name = "Date"
 
-        now_utc_naive = datetime.now(timezone.utc).replace(tzinfo=None)
-        schedule = NYSE_CAL.schedule(start_date=now_utc_naive, end_date=now_utc_naive)
+        # now_utc_naive = datetime.now(timezone.utc).replace(tzinfo=None)
+        # schedule = NYSE_CAL.schedule(start_date=now_utc_naive, end_date=now_utc_naive)
+        # if not schedule.empty:
+        #     mkt_open = schedule.iloc[0]['market_open'].replace(tzinfo=None)
+        #     mkt_close = schedule.iloc[0]['market_close'].replace(tzinfo=None)
+        #
+        #     # If we are currently between open and close, the last downloaded row is "Live"
+        #     if mkt_open <= now_utc_naive <= mkt_close:
+        #         data = data.iloc[:-1]
 
-        if not schedule.empty:
-            mkt_open = schedule.iloc[0]['market_open'].replace(tzinfo=None)
-            mkt_close = schedule.iloc[0]['market_close'].replace(tzinfo=None)
-
-            # If we are currently between open and close, the last downloaded row is "Live"
-            if mkt_open <= now_utc_naive <= mkt_close:
-                data = data.iloc[:-1]
-
-        data.to_parquet(os.path.join(DATA_DIR, f"{key}_{interval}.parquet"))
+        # data.to_parquet(os.path.join(DATA_DIR, f"{key}_{interval}.parquet"))
+        data.to_parquet(os.path.join(HYPER_DIR, "Profile F", f"{key}_{interval}.parquet"))
 
 ##############################################################################################################
 """ testing pipeline """
@@ -560,39 +560,19 @@ if __name__ in "__main__":
     import time
     start = time.perf_counter()
 
-    from predictor import TrainingManager, Settings, run_prediction_pipeline
+    # from predictor import TrainingManager, Settings, run_prediction_pipeline
     # print("Training...")
     # success = TrainingManager().run_training_pipeline("AAPL", "1d")
     # print(success)
-    print("Predicting...")
-    run_prediction_pipeline("AAPL", "1d")
+    # print("Predicting...")
+    # run_prediction_pipeline("AAPL", "1d")
 
-    # initial_download()
 
-    # import folder_trees
-    # folder_trees.generate_tree("C:/Users/adlan_3zfnjq7/Desktop/Alex - Main/Projects/LoTi-Log", ignore_paths=[".briefcase"])
 
-    # find_missing_files()
-    # remove_ticker_info()
-
-    # get_special("^VIX")
-    # get_special("^VVIX")
-    # get_special("^TYX")
-
-    # test_train()
-    # test_predict()
-    # validate_ledgers()
-
-    # find_dupes()
-    # list_dir()
-    # check_model_corruption()
 
     print(time.perf_counter() - start)
     pass
 
 
-# tickers with no models:
-# {'CRL_1h', 'AMGN_1d', 'HSIC_1d', 'SUI_1d', 'ICLR_1h', 'ISRG_1d', 'FAST_1d', 'AXTI_1d', 'OVV_1h', 'CTAS_1d', 'BAH_1d', 'KMX_1d', 'PEGA_1d', 'MRK_1d', 'MCHP_1d', 'RBC_1d', 'PCAR_1h', 'ESLT_1h', 'BEN_1h', 'DUOL_1d', 'TEVA_1d', 'SAN_1d', 'TRU_1d', 'PPG_1h', 'SCCO_1d', 'DE_1h', 'UHS_1d', 'CHTR_1d', 'FFIV_1d', 'MARA_1d', 'EFX_1d', 'AMD_1d', 'USFD_1d', 'INTC_1d', 'GWRE_1d', 'EXK_1d', 'WHR_1h', 'TCOM_1d', 'SWK_1d', 'KTOS_1d', 'WIX_1d', 'MTCH_1d', 'ALLE_1d', 'EOG_1d', 'PR_1d', 'GLW_1h', 'LFUS_1d', 'EPAM_1h', 'WDC_1h', 'EMR_1d'}
-
-# tickers with fucked models:
-# {'TAP_1d', 'FRPT_1d', 'SN_1h', 'WEC_1h', 'HUM_1d', 'NLY_1h', 'NLY_1d', 'HUM_1h', 'FRPT_1h', 'TAP_1h', 'LASR_1h', 'WEC_1d', 'CYBR_1d', 'CYBR_1h', 'T_1h', 'MMC_1h', 'SN_1d', 'LASR_1d', 'EXPD_1d', 'GPC_1d', 'T_1d', 'GPC_1h', 'MMC_1d', 'EXPD_1h'}
+    # import folder_trees
+    # folder_trees.generate_tree("C:/Users/adlan_3zfnjq7/Desktop/Alex - Main/Projects/LoTi-Log", ignore_paths=[".briefcase"])

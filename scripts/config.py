@@ -11,8 +11,9 @@ CACHE_DIR = os.path.join(ROOT_DIR, "cache_files")
 MODEL_DIR = os.path.join(ROOT_DIR, "models")
 LEDGER_DIR = os.path.join(ROOT_DIR, "ledgers")
 DATA_DIR = os.path.join(ROOT_DIR, "data")
+HYPER_DIR = os.path.join(ROOT_DIR, "hyper-stocks")
 
 # Create them if they don't exist
-for path in [IMG_DIR, CACHE_DIR, MODEL_DIR, LEDGER_DIR, DATA_DIR]:
+for path in [IMG_DIR, CACHE_DIR, MODEL_DIR, LEDGER_DIR, DATA_DIR, HYPER_DIR]:
     if not os.path.exists(path):
         os.makedirs(path)

@@ -138,21 +138,31 @@ class TrainingManager:
 
         acc = accuracy_score(actual, predicted)
 
-        # Strategy return aligns with the direction predicted:
-        # Long (1) gets the path return, Short (-1) gets inverted path return, Hold (0) gets 0
-        strategy_returns = np.nan_to_num(actual_returns * predicted)
+        if interval == "1d": bars = 252
+        elif interval == "1h": bars = 1638
+        else: raise ValueError("Interval length not valid.")
 
-        if len(strategy_returns) < 2 or np.std(strategy_returns) == 0:
-            sharpe = 0.0
-        else:
-            if interval == "1d": bars = 252
-            elif interval == "1h": bars = 1638
-            else: raise NotImplementedError("Interval length not implemented yet.")
+        # Calculate custom utility scorecard returns
+        # Base logic: Strategy return aligns with direction predicted
+        custom_scores = np.nan_to_num(actual_returns * predicted)
 
-            sharpe = np.mean(strategy_returns) / (np.std(strategy_returns) + 1e-9) * np.sqrt(bars)
+        # Rule 1: Symmetrical breakout errors (Actual was a trend, but prediction was perfectly backwards)
+        opposite_mask = (actual != 0) & (predicted == -actual)
+        custom_scores[opposite_mask] = 2.0 * custom_scores[opposite_mask]
+
+        # Rule 2: Drift errors during Hold periods (Actual was 0, but model took a position that bled money)
+        hold_wrong_mask = (actual == 0) & (custom_scores < 0)
+        custom_scores[hold_wrong_mask] = 2.0 * custom_scores[hold_wrong_mask]
+
+        # Rule 3: Reward the model for correctly flatlining/holding when it should have
+        hold_right_mask = (actual == 0) & (predicted == 0)
+        custom_scores[hold_right_mask] = np.abs(actual_returns[hold_right_mask]).mean() * 0.1
+
+        # Annualize the performance score card
+        util_score = (np.mean(custom_scores) / (np.std(custom_scores) + 1e-9)) *np.sqrt(bars)
 
         # Calculate stability
-        cumulative_returns = np.cumsum(strategy_returns)
+        cumulative_returns = np.cumsum(custom_scores)
         if len(cumulative_returns) > 1:
             x = np.arange(len(cumulative_returns))
             slope, intercept, r_value, p_value, std_err = stats.linregress(x, cumulative_returns)
@@ -160,7 +170,7 @@ class TrainingManager:
         else:
             stability = 0.0
 
-        return acc, sharpe, stability
+        return acc, util_score, stability
 
     @staticmethod
     def create_3d_sequences(data: np.ndarray, targets: np.ndarray, window: int = 30) -> tuple:
@@ -196,24 +206,24 @@ class TrainingManager:
 
             # Penalize models that take zero trades to close the safe haven loophole
             if np.all(preds == 0):
-                local_sharpe = -1.0
+                util_score = -1.0
             else:
                 # Optimize for Sharpe Ratio
-                _, local_sharpe, _ = self.evaluate_performance(
+                _, util_score, _ = self.evaluate_performance(
                     interval, self.y_train.iloc[val_idx].values, preds, self.returns_train[val_idx]
                 )
-            scores.append(local_sharpe)
+            scores.append(util_score)
 
         # Retrain on full training set, then evaluate on the held-out test set
         model.fit(self.X_train, y_train_shifted)
         test_preds = model.predict(self.X_test) - 1  # Shift back to {-1,0,1} for evaluation
 
-        accuracy, sharpe, stability = self.evaluate_performance(interval, self.y_test.values, test_preds, self.returns_test)
+        accuracy, util_score, stability = self.evaluate_performance(interval, self.y_test.values, test_preds, self.returns_test)
 
         return {
             'type': 'LGBM', 'model': model,
             'accuracy': accuracy, 'stability': stability,
-            'sharpe': sharpe, 'wf_sharpe': float(np.mean(scores)),
+            'util_score': util_score, 'wf_util_score': float(np.mean(scores)),
         }
 
     def _train_catboost(self, interval: str, horizon: int, hyperparams: dict) -> dict:
@@ -231,35 +241,35 @@ class TrainingManager:
         scores = []
         for train_idx, val_idx in tscv.split(self.X_train):
             if y_train_shifted.iloc[train_idx].nunique() <= 1:
-                local_sharpe = -1.0
+                util_score = -1.0
             else:
                 model.fit(self.X_train[train_idx], y_train_shifted.iloc[train_idx])
                 preds = model.predict(self.X_train[val_idx]).flatten() - 1
 
                 # Penalize models that take zero trades to close the safe haven loophole
                 if np.all(preds == 0):
-                    local_sharpe = -1.0
+                    util_score = -1.0
                 else:
                     # Optimize for Sharpe Ratio
-                    _, local_sharpe, _ = self.evaluate_performance(
+                    _, util_score, _ = self.evaluate_performance(
                         interval, self.y_train.iloc[val_idx].values, preds, self.returns_train[val_idx]
                     )
-            scores.append(local_sharpe)
+            scores.append(util_score)
 
         model.fit(self.X_train, y_train_shifted)
         test_preds = model.predict(self.X_test).flatten() - 1  # Shift back to {-1,0,1}
 
-        accuracy, sharpe, stability = self.evaluate_performance(interval, self.y_test.values, test_preds, self.returns_test)
+        accuracy, util_score, stability = self.evaluate_performance(interval, self.y_test.values, test_preds, self.returns_test)
         return {
             'type': 'CAT', 'model': model,
             'accuracy': accuracy, 'stability': stability,
-            'sharpe': sharpe, 'wf_sharpe': float(np.mean(scores)),
+            'util_score': util_score, 'wf_util_score': float(np.mean(scores)),
         }
 
     def _train_lstm(self, interval: str, horizon: int, hyperparams: dict) -> dict:
         lstm_params = hyperparams["LSTM"]["best_params"]
         optimizers = {"Adam": torch.optim.Adam, "AdamW": torch.optim.AdamW, "RMSprop": torch.optim.RMSprop}  # noqa
-        optimzer = optimizers.get(lstm_params.pop("optimizer_name"), torch.optim.Adam)
+        optimizer = optimizers.get(lstm_params.pop("optimizer_name"), torch.optim.Adam)
 
         window = 30
 
@@ -286,7 +296,7 @@ class TrainingManager:
                 module__output_dim=3,
                 criterion=nn.CrossEntropyLoss,
                 criterion__weight=weight_tensor,
-                optimizer=optimzer,
+                optimizer=optimizer,
                 train_split=dataset.ValidSplit(0.2, stratified=False),
                 iterator_train__shuffle=False,
                 device='cuda' if torch.cuda.is_available() and Settings.GPU["LSTM"] else 'cpu',
@@ -316,13 +326,13 @@ class TrainingManager:
 
             # Penalize models that take zero trades to close the safe haven loophole
             if np.all(preds == 0):
-                local_sharpe = -1.0
+                util_score = -1.0
             else:
                 # Optimize for Sharpe Ratio
-                _, local_sharpe, _ = self.evaluate_performance(
+                _, util_score, _ = self.evaluate_performance(
                     interval, y_train_seq[val_idx], preds, returns_train_seq[val_idx]
                 )
-            scores.append(local_sharpe)
+            scores.append(util_score)
 
         # Final model trained on all training sequences
         model = build_skorch_model()
@@ -330,12 +340,12 @@ class TrainingManager:
         test_preds = model.predict(x_test_3d) - 1
 
         returns_test_seq = np.concatenate((self.returns_train[-window:], self.returns_test))[window:]
-        accuracy, sharpe, stability = self.evaluate_performance(interval, y_test_seq, test_preds, returns_test_seq)
+        accuracy, util_score, stability = self.evaluate_performance(interval, y_test_seq, test_preds, returns_test_seq)
 
         return {
             'type': 'LSTM', 'model': model,
             'accuracy': accuracy, 'stability': stability,
-            'sharpe': sharpe, 'wf_sharpe': float(np.mean(scores)),
+            'util_score': util_score, 'wf_util_score': float(np.mean(scores)),
         }
 
     def _save_model_assets(self, ticker: str, interval: str, training_data_end: pd.Timestamp, full_results: dict) -> None:
@@ -358,10 +368,10 @@ class TrainingManager:
                 model = model_results['model']
 
                 metadata["model_results"][horizon][model_type] = {
-                    "accuracy":   model_results['accuracy'],
-                    "sharpe":     model_results['sharpe'],
-                    "wf_sharpe":  model_results['wf_sharpe'],
-                    "stability":  model_results['stability'],
+                    "accuracy":       model_results['accuracy'],
+                    "util_score":     model_results['util_score'],
+                    "wf_util_score":  model_results['wf_util_score'],
+                    "stability":      model_results['stability'],
                 }
 
                 if model_type == 'LSTM':
@@ -387,9 +397,8 @@ class TrainingManager:
             elif Settings.LOGGING: print(msg)
 
         all_horizons = {
-            "15m": {2: 0.5, 4: 1, 8: 2, 13: 3.25},  # bars: hours
-            "1h": {1: 1, 2: 2, 4: 4, 8: 25},  # bars: hours
-            "1d": {1: 1, 4: 4, 10: 14, 20: 28}  # bars: days
+            "1h": {2: 2, 4: 4, 8: 25},  # bars: hours
+            "1d": {2: 2, 4: 4, 8: 10},  # bars: days
         }
         horizons = list(all_horizons.get(interval, {}).keys())
 
@@ -494,11 +503,7 @@ def save_prediction(ticker: str, interval: str, forecast_results: dict) -> None:
 
 def load_prediction(ticker: str, interval: str, date: datetime) -> dict | None:
     # Filter for the specific data line matching the exact runtime parameters
-    horizons = {
-        "1h": ["1", "2", "4", "8"],
-        "1d": ["1", "4", "10", "20"]
-    }.get(interval, [])
-    match = find_prediction_match(ticker, interval, horizons, date)
+    match = find_prediction_match(ticker, interval, ["2", "4", "8"], date)
 
     if match is None or match.empty: return None
     match_dicts = match.reset_index().to_dict(orient='records')
@@ -538,9 +543,8 @@ def find_prediction_match(ticker: str, interval: str, horizons: list, date: date
 
 def run_prediction_pipeline(ticker: str, interval: str) -> dict:
     horizons = {
-        "15m": {2: 0.5, 4: 1, 8: 2, 13: 3.25},  # bars: hours
-        "1h": {1: 1, 2: 2, 4: 4, 8: 25},  # bars: hours
-        "1d": {1: 1, 4: 4, 10: 14, 20: 28}  # bars: days
+        "1h": {2: 2, 4: 4, 8: 25},  # bars: hours
+        "1d": {2: 2, 4: 4, 8: 10},  # bars: days
     }.get(interval, {})
 
     df, assets = prepare_prediction_data(ticker, interval, horizons)
@@ -715,11 +719,11 @@ def generate_forecasts(df: pd.DataFrame, ticker: str, interval: str, horizons: d
             model_meta = meta.get("model_results", {}).get(str_step, {}).get(m_type, {})
             results_weight = {"LGBM": 0.33, "Cat": 0.33, "LSTM": 0.33}.get(m_type, 0.33)
 
-            sharpe     =  max(0.0, model_meta.get("sharpe", 0.0))
-            wf_sharpe  =  max(0.0, model_meta.get("wf_sharpe", 0.0))
-            acc        =  max(0.0, model_meta.get("accuracy", 0.0) - 0.33)
+            util_score     =  max(0.0, model_meta.get("util_score", 0.0))
+            wf_util_score  =  max(0.0, model_meta.get("wf_util_score", 0.0))
+            acc            =  max(0.0, model_meta.get("accuracy", 0.0) - 0.33)
 
-            weights[m_type] = (results_weight * 0.0) + (wf_sharpe * 0.5) + (sharpe * 0.3) + (acc * 0.2)
+            weights[m_type] = (results_weight * 0.0) + (wf_util_score * 0.5) + (util_score * 0.3) + (acc * 0.2)
 
         total_weight = sum(weights.values())
         avg_proba = sum(probs[m] * weights[m] for m in probs) / total_weight if total_weight > 0 else 0.5
