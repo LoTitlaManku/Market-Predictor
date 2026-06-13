@@ -31,7 +31,7 @@ import scripts.indicators_tuning # noqa
 
 class Settings:
     VERBOSE = 0
-    GPU = {"LGBM": True, "CAT": True, "LSTM": True}
+    GPU = {"LGBM": False, "CAT": True, "LSTM": True}
 
 def flush_memory():
     gc.collect()
