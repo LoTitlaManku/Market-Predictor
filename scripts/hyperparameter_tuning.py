@@ -293,7 +293,7 @@ class TrainingManager:
                 'class_weight': class_weight,
                 'verbose': -1,
                 'n_jobs': -1,
-                'device_type': 'gpu' if Settings.GPU["LGBM"] else "cpu"
+                'device_type': 'cuda' if Settings.GPU["LGBM"] else "cpu"
             }
 
             model = LGBMClassifier(**params)
