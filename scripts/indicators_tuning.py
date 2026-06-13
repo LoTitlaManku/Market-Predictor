@@ -20,6 +20,7 @@ class TechnicalAnalysisAccessor:
         df = self._add_sentiment(df, ticker)
         df = self._add_technical_indicators(df, interval)
         df = self._add_vix(df, interval)
+        df = self._add_spy(df, interval)
         df = self._add_vix_plus(df, interval)
         df = self._add_macro_context(df, interval)
         df = self._add_targets(df, interval, horizon)
@@ -186,32 +187,107 @@ class TechnicalAnalysisAccessor:
     @staticmethod
     def _add_targets(df: pd.DataFrame, interval: str, horizon: int) -> pd.DataFrame:
         if horizon <= 0:
-            raise ValueError("horizon must be a positive integer")
+            raise ValueError("horizon must be positive")
 
-        # Calculate future returns over the given horizon window
-        tbm_returns = (df['Adj Close'].shift(-horizon) / df['Adj Close']) - 1
-
-        if interval == "1d": bars = 252
-        elif interval == "1h": bars = 1638
-        else: raise ValueError("Invalid interval")
-
-        historical_returns = df['Adj Close'].pct_change(horizon)
-
-        upper_barrier = historical_returns.rolling(window=bars, min_periods=30).quantile(0.80)
-        lower_barrier = historical_returns.rolling(window=bars, min_periods=30).quantile(0.20)
-
+        future_returns = np.zeros(len(df))
         labels = np.zeros(len(df))
+        barrier_strength = np.zeros(len(df))
 
-        labels[tbm_returns >= upper_barrier] = 1
-        labels[tbm_returns <= lower_barrier] = -1
+        close = df['Adj Close'].values
+        high = df['High'].values
+        low = df['Low'].values
+        atr = df['ATR'].values
+
+        up_strength_hist = np.full(len(df), np.nan)
+        down_strength_hist = np.full(len(df), np.nan)
+
+        for i in range(len(df) - horizon):
+            entry = close[i]
+
+            if np.isnan(entry) or np.isnan(atr[i]) or atr[i] <= 0:
+                continue
+
+            atr_return = atr[i] / entry
+            future_high = np.nanmax(high[i + 1:i + horizon + 1])
+            future_low = np.nanmin(low[i + 1:i + horizon + 1])
+
+            up_strength_hist[i] = ((future_high / entry) - 1) / (atr_return + 1e-9)
+            down_strength_hist[i] = ((entry / future_low) - 1) / (atr_return + 1e-9)
+
+        if interval == "1d":
+            lookback = 252
+            min_periods = 60
+        elif interval == "1h":
+            lookback = 1638
+            min_periods = 200
+        else:
+            raise ValueError("Invalid interval")
+
+        up_strength_series = pd.Series(up_strength_hist, index=df.index)
+        down_strength_series = pd.Series(down_strength_hist, index=df.index)
+
+        up_barrier_mult = up_strength_series.shift(horizon).rolling(lookback, min_periods).quantile(0.80)
+        down_barrier_mult = down_strength_series.shift(horizon).rolling(lookback, min_periods).quantile(0.80)
+
+        fallback_mult = {
+            "1h": {2: 0.8, 4: 1.2, 8: 1.6},
+            "1d": {2: 0.5, 4: 0.8, 8: 1.1},
+        }
+
+        fallback = fallback_mult.get(interval, {}).get(horizon, 1.0)
+        up_barrier_mult = up_barrier_mult.fillna(fallback).clip(0.25, 3.0)
+        down_barrier_mult = down_barrier_mult.fillna(fallback).clip(0.25, 3.0)
+
+        for i in range(len(df) - horizon):
+            entry = close[i]
+
+            if np.isnan(entry) or np.isnan(atr[i]) or atr[i] <= 0:
+                labels[i] = 0
+                future_returns[i] = 0
+                barrier_strength[i] = 0
+                continue
+
+            tp_return = (atr[i] * up_barrier_mult.iloc[i]) / entry
+            sl_return = (atr[i] * down_barrier_mult.iloc[i]) / entry
+
+            take_profit = entry * (1.0 + tp_return)
+            stop_loss = entry * (1.0 - sl_return)
+
+            hit_label = 0
+            hit_return = (close[i + horizon] / entry) - 1
+
+            max_up_strength = 0.0
+            max_down_strength = 0.0
+
+            for j in range(1, horizon + 1):
+                high_j = high[i + j]
+                low_j = low[i + j]
+
+                up_strength = ((high_j / entry) - 1) / (tp_return + 1e-9)
+                down_strength = ((entry / low_j) - 1) / (sl_return + 1e-9)
+
+                max_up_strength = max(max_up_strength, up_strength)
+                max_down_strength = max(max_down_strength, down_strength)
+
+                if low_j <= stop_loss:
+                    hit_label = -1
+                    hit_return = -sl_return
+                    break
+
+                if high_j >= take_profit:
+                    hit_label = 1
+                    hit_return = tp_return
+                    break
+
+            labels[i] = hit_label
+            future_returns[i] = hit_return
+            barrier_strength[i] = max(max_up_strength, max_down_strength)
 
         df['target_profit'] = labels.astype(int)
-        df['tbm_return'] = tbm_returns.fillna(0)
+        df['tbm_return'] = future_returns
+        df['barrier_strength'] = np.clip(barrier_strength, 0.0, 1.0)
 
-        df = df.iloc[:-horizon]
-        valid_idx = upper_barrier.dropna().index.intersection(df.index)
-
-        return df.loc[valid_idx]
+        return df.iloc[:-horizon]
 
     @staticmethod
     def _add_vix(df: pd.DataFrame, interval: str):
