@@ -561,11 +561,9 @@ if __name__ in "__main__":
     start = time.perf_counter()
 
     from predictor import TrainingManager, Settings, run_prediction_pipeline
-    Settings.LOGGING = True
-    Settings.GPU = False
-    print("Training...")
-    success = TrainingManager().run_training_pipeline("AAPL", "1d", horizon=4)
-    print(success)
+    # print("Training...")
+    # success = TrainingManager().run_training_pipeline("AAPL", "1d")
+    # print(success)
     print("Predicting...")
     run_prediction_pipeline("AAPL", "1d")
 

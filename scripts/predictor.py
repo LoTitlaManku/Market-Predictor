@@ -2,6 +2,7 @@
 # Standard library imports
 import json
 import os
+import time
 from pathlib import Path
 import shutil
 import warnings
@@ -37,10 +38,10 @@ from scripts.config import LEDGER_DIR, MODEL_DIR, DATA_DIR
 import scripts.indicators # noqa
 
 class Settings:
-    VERBOSE = 0      # Set whether to display model logging or not
-    LOGGING = False  # Set whether to display prints for training stages
-    GPU = True       # Set whether to use GPU if possible
-    Threaded = False # Set whether a singular model is being trained on multiple threads
+    VERBOSE = 0                                      # Set whether to display model logging or not
+    LOGGING = False                                  # Set whether to display prints for training stages
+    GPU = {"LGBM": True, "CAT": True, "LSTM": True}  # Set which model types can use GPU
+    Threaded = False                                 # Set whether a singular model is being trained on multiple threads
 
 def flush_memory():
     gc.collect()
@@ -171,7 +172,7 @@ class TrainingManager:
 
     def _train_lightgbm(self, interval: str, horizon: int, hyperparams: dict) -> dict:
         lgbm_params = hyperparams["LGBM"]["best_params"]
-        if Settings.GPU:
+        if Settings.GPU["LGBM"]:
             lgbm_params.update({"device_type": "gpu", "gpu_platform_id": 0, "gpu_device_id": 0})
         if Settings.Threaded:
             lgbm_params.update({"num_threads": -1, "n_jobs": -1})
@@ -217,6 +218,7 @@ class TrainingManager:
 
     def _train_catboost(self, interval: str, horizon: int, hyperparams: dict) -> dict:
         cat_params = hyperparams["CAT"]["best_params"]
+        if Settings.GPU["CAT"]: cat_params["task_type"] = "GPU"
         model = CatBoostClassifier(
             random_state=self.seed,
             verbose=False,
@@ -256,12 +258,11 @@ class TrainingManager:
 
     def _train_lstm(self, interval: str, horizon: int, hyperparams: dict) -> dict:
         lstm_params = hyperparams["LSTM"]["best_params"]
-        if Settings.GPU:
-            lstm_params.update({"device_type": "gpu", "gpu_platform_id": 0, "gpu_device_id": 0})
-        if Settings.Threaded:
-            lstm_params.update({"num_threads": -1, "n_jobs": -1})
+        optimizers = {"Adam": torch.optim.Adam, "AdamW": torch.optim.AdamW, "RMSprop": torch.optim.RMSprop}  # noqa
+        optimzer = optimizers.get(lstm_params.pop("optimizer_name"), torch.optim.Adam)
 
         window = 30
+
         X_test_padded = np.vstack((self.X_train[-window:], self.X_test))
         y_test_padded = np.concatenate((self.y_train.values[-window:], self.y_test.values))
 
@@ -279,18 +280,16 @@ class TrainingManager:
         weight_tensor = torch.tensor(weights, dtype=torch.float).to('cuda' if torch.cuda.is_available() else 'cpu')
 
         def build_skorch_model() -> NeuralNetClassifier:
-            optimizers = {"Adam": torch.optim.Adam, "AdamW": torch.optim.AdamW, "RMSprop": torch.optim.RMSprop}  # noqa
-            opt = lstm_params.pop("optimizer_name")
             return NeuralNetClassifier(
                 LSTMBrain,
                 module__input_dim=input_dim,
                 module__output_dim=3,
                 criterion=nn.CrossEntropyLoss,
                 criterion__weight=weight_tensor,
-                optimizer=optimizers.get(opt, torch.optim.Adam),
+                optimizer=optimzer,
                 train_split=dataset.ValidSplit(0.2, stratified=False),
                 iterator_train__shuffle=False,
-                device='cuda' if torch.cuda.is_available() else 'cpu',
+                device='cuda' if torch.cuda.is_available() and Settings.GPU["LSTM"] else 'cpu',
                 verbose=Settings.VERBOSE,
                 callbacks=[
                     ('early_stopping', EarlyStopping(
@@ -346,12 +345,15 @@ class TrainingManager:
         metadata = {
             "training_date":      datetime.now().strftime("%Y-%m-%d"),
             "training_data_end":  training_data_end.strftime("%Y-%m-%d"),
+            "ticker":             ticker,
             "interval":           interval,
-            "model_results":      {K: {} for K in full_results.keys()}
+            "model_results":      {k: {} for k in full_results.keys()}
         }
 
         for horizon, results in full_results.items():
-            horizon_folder = os.path.join(save_folder, f"{horizon}")
+            horizon_folder = os.path.join(save_folder, horizon)
+            if not os.path.exists(horizon_folder): os.makedirs(horizon_folder)
+
             for model_type, model_results in results.items():
                 model = model_results['model']
 
@@ -384,19 +386,19 @@ class TrainingManager:
 
             elif Settings.LOGGING: print(msg)
 
+        all_horizons = {
+            "15m": {2: 0.5, 4: 1, 8: 2, 13: 3.25},  # bars: hours
+            "1h": {1: 1, 2: 2, 4: 4, 8: 25},  # bars: hours
+            "1d": {1: 1, 4: 4, 10: 14, 20: 28}  # bars: days
+        }
+        horizons = list(all_horizons.get(interval, {}).keys())
+
         model_path = os.path.join(MODEL_DIR, f"{ticker}_{interval}")
-        if all_ticker_models_exist(model_path) and not force_train:
+        if all_ticker_models_exist(model_path, horizons) and not force_train:
             log_update(f"Model {ticker} ({interval}) already trained", True)
             return True
 
         if os.path.exists(model_path): shutil.rmtree(model_path)
-
-        all_horizons = {
-            "15m": {2: 0.5,  4: 1,  8: 2,    13: 3.25},  # bars: hours
-            "1h":  {1: 1,    2: 2,  4: 4,    8: 25},     # bars: hours
-            "1d":  {1: 1,    4: 4,  10: 14,  20: 28}     # bars: days
-        }
-        horizons = all_horizons[interval]
 
         log_update("Loading data...")
         raw_data = load_data(ticker, interval)
@@ -409,8 +411,8 @@ class TrainingManager:
         hypers = hyperparams[interval]
 
         results = {}
-        for horizon in horizons.keys():
-            log_update("Adding features...")
+        for horizon in horizons:
+            log_update(f"Adding features ({horizon})...")
             df = raw_data.ind.add_indicators(ticker, interval, horizon)
             if len(df) < 300:
                 log_update(f"Insufficient processed data for {ticker} ({interval}) — need 300+, got {len(df)}", True)
@@ -418,20 +420,32 @@ class TrainingManager:
 
             log_update("Preparing features...")
             self._prepare_data(df)
-            horizon_hypers = hypers[str(horizon)]
-            results[horizon] = {}
+            str_hor = str(horizon)
+            horizon_hypers = hypers[str_hor]
+            results[str_hor] = {}
+
+            time1 = time.perf_counter()
 
             print("Tuning LightGBM...")
-            results[horizon]["LGBM"] = self._train_lightgbm(interval, horizon, horizon_hypers)
+            results[str_hor]["LGBM"] = self._train_lightgbm(interval, horizon, horizon_hypers)
             flush_memory()
+
+            time2 = time.perf_counter()
+            print(f"Time taken: {time2 - time1}s")
 
             print("Tuning CatBoost...")
-            results[horizon]["CAT"]  = self._train_catboost(interval, horizon, horizon_hypers)
+            results[str_hor]["CAT"]  = self._train_catboost(interval, horizon, horizon_hypers)
             flush_memory()
 
+            time3 = time.perf_counter()
+            print(f"Time taken: {time3 - time2}s")
+
             print("Tuning LSTM...")
-            results[horizon]["LSTM"] = self._train_lstm    (interval, horizon, horizon_hypers)
+            results[str_hor]["LSTM"] = self._train_lstm    (interval, horizon, horizon_hypers)
             flush_memory()
+
+            time4 = time.perf_counter()
+            print(f"Time taken: {time4 - time3}s")
 
         log_update("Saving assets...")
         self._save_model_assets(ticker, interval, raw_data.index.max(), results)
@@ -457,13 +471,15 @@ def save_prediction(ticker: str, interval: str, forecast_results: dict) -> None:
 
     ledger_file = os.path.join(LEDGER_DIR, f"{ticker}_ledger.csv")
     new_entries = []
-    for _, data in forecast_results.items():
-        existing_match = find_prediction_match(ticker, interval, data["Date_Predicted"])
+    for horizon, data in forecast_results.items():
+        existing_match = find_prediction_match(ticker, interval, [horizon], data["Start_Date"])
         if existing_match is not None and not existing_match.empty: continue
 
         new_entries.append({
             "Interval": interval,
-            'Open_Date': data["Date_Predicted"],
+            "Horizon": horizon,
+            'Start_Date': data["Start_Date"],
+            "End_Date": data["End_Date"],
             "Current_Price": round(data['Current_Price'], 2),
             'AVG_signal': f"{data['AVG_signal']:.3f}",
             'CAT_signal': f"{data['CAT_signal']:.3f}",
@@ -478,27 +494,32 @@ def save_prediction(ticker: str, interval: str, forecast_results: dict) -> None:
 
 def load_prediction(ticker: str, interval: str, date: datetime) -> dict | None:
     # Filter for the specific data line matching the exact runtime parameters
-    match = find_prediction_match(ticker, interval, date)
+    horizons = {
+        "1h": ["1", "2", "4", "8"],
+        "1d": ["1", "4", "10", "20"]
+    }.get(interval, [])
+    match = find_prediction_match(ticker, interval, horizons, date)
+
     if match is None or match.empty: return None
     match_dicts = match.reset_index().to_dict(orient='records')
 
     # Rebuild the forecast_results dict
     try:
         forecast_results = {}
-        row = match_dicts[0]
-        forecast_results["Temp"] = {
-            "Date_Predicted": pd.to_datetime(row['Open_Date'], format="ISO8601"),
-            "Current_Price": float(row['Current_Price']),
-            'AVG_signal': float(row['AVG_signal']),
-            'CAT_signal': float(row['CAT_signal']),
-            'LGBM_signal': float(row['LGBM_signal']),
-            'LSTM_signal': float(row['LSTM_signal']),
-        }
+        for row in match_dicts:
+            forecast_results[row["Horizon"]] = {
+                "Date_Predicted": pd.to_datetime(row['Open_Date'], format="ISO8601"),
+                "Current_Price": float(row['Current_Price']),
+                'AVG_signal': float(row['AVG_signal']),
+                'CAT_signal': float(row['CAT_signal']),
+                'LGBM_signal': float(row['LGBM_signal']),
+                'LSTM_signal': float(row['LSTM_signal']),
+            }
         return forecast_results
 
     except Exception: return None # noqa
 
-def find_prediction_match(ticker: str, interval: str, date: datetime) -> pd.DataFrame | None:
+def find_prediction_match(ticker: str, interval: str, horizons: list, date: datetime) -> pd.DataFrame | None:
     ledger_file = os.path.join(LEDGER_DIR, f"{ticker}_ledger.csv")
     try:
         ledger = pd.read_csv(ledger_file)
@@ -506,45 +527,37 @@ def find_prediction_match(ticker: str, interval: str, date: datetime) -> pd.Data
     except FileNotFoundError: return None
 
     ledger = pd.read_csv(ledger_file)
-    ledger['Open_Date'] = pd.to_datetime(ledger['Open_Date'], format='ISO8601')
+    ledger['Start_Date'] = pd.to_datetime(ledger['Start_Date'], format='ISO8601')
 
     # Check if any entry matches current ticker and last trade date
     date = date.strftime("%Y-%m-%d %H:%M")
-    match = ledger[(ledger['Interval'] == interval) & (ledger['Open_Date'] == date)]
+    match = ledger[(ledger['Interval'] == interval) & (ledger['Start_Date'] == date) & (ledger['Horizon'].isin(horizons))]
     return match
 
 ########################################################################################################################
 
-def run_prediction_pipeline(ticker: str, interval: str, horizon: int = 4) -> dict:
-    processed_df, assets = prepare_prediction_data(ticker, interval, horizon)
-    if any(v is None for v in [processed_df, assets]):
+def run_prediction_pipeline(ticker: str, interval: str) -> dict:
+    horizons = {
+        "15m": {2: 0.5, 4: 1, 8: 2, 13: 3.25},  # bars: hours
+        "1h": {1: 1, 2: 2, 4: 4, 8: 25},  # bars: hours
+        "1d": {1: 1, 4: 4, 10: 14, 20: 28}  # bars: days
+    }.get(interval, {})
+
+    df, assets = prepare_prediction_data(ticker, interval, horizons)
+    if any(v is None for v in [df, assets]):
         print("No data or assets.")
         return {}
 
-    last_trade_date = processed_df.index[-1]
-
-    horizons = {
-        "15m": {2: 0.5,  4: 1,  8: 2,    13: 3.25},  # bars: hours
-        "1h":  {1: 1,    2: 2,  4: 4,    8: 25},     # bars: hours
-        "1d":  {1: 1,    4: 4,  10: 14,  20: 28}     # bars: days
-    }
-
-    # Load or generate from new assets ledger
+    last_trade_date = df.index[-1]
     forecast_results = load_prediction(ticker, interval, last_trade_date)
-    if forecast_results is None:
-        tech_info = (
-            interval,
-            horizons.get(interval),
-            last_trade_date,
-            float(processed_df['Adj Close'].iloc[-1]),
-        )
 
-        forecast_results = generate_forecasts(processed_df, assets, tech_info)
+    if forecast_results is None:
+        forecast_results = generate_forecasts(df, ticker, interval, horizons, assets)
         save_prediction(ticker, interval, forecast_results)
 
     return forecast_results
 
-def prepare_prediction_data(ticker: str, interval: str, horizon: int = 4) -> tuple:
+def prepare_prediction_data(ticker: str, interval: str, horizons: dict) -> tuple:
     model_path = os.path.join(MODEL_DIR, f"{ticker}_{interval}")
     manager = TrainingManager()
 
@@ -570,20 +583,16 @@ def prepare_prediction_data(ticker: str, interval: str, horizon: int = 4) -> tup
             df = pd.concat([df, new_row])
 
     # Trains a model if needed using the base implementation checks
-    if not all_ticker_models_exist(model_path):
+    if not all_ticker_models_exist(model_path, list(horizons.keys())):
         success = manager.run_training_pipeline(ticker, interval)
         if not success: return None, None
-
-    # Load assets
-    processed_df = df.ind.add_indicators(ticker, interval, horizon)
-    if processed_df.empty: return None, None
 
     scaler = joblib.load(f"{model_path}/scaler.joblib")
     features = joblib.load(f"{model_path}/features.joblib")
 
-    return processed_df, (scaler, features, model_path)
+    return df, (scaler, features, model_path)
 
-def get_market_dates(latest_date, horizons: dict, interval: str) -> dict:
+def get_market_dates(latest_date: pd.Timestamp, horizons: dict, interval: str) -> dict:
     market_targets = {}
 
     # latest_date is the OPENING time
@@ -595,7 +604,7 @@ def get_market_dates(latest_date, horizons: dict, interval: str) -> dict:
 
     if interval == "1d":
         # For daily: List of DAYs (e.g. '2026-03-06')
-        valid_times = schedule.index.normalize()
+        valid_times = schedule.index.normalize() # noqa
     else:
         # For 1h/15m: List of CLOSING times of the HOUR (e.g. 15:30 to 21:00)
         valid_times = mcal.date_range(schedule, frequency="1h")
@@ -630,15 +639,15 @@ def get_market_dates(latest_date, horizons: dict, interval: str) -> dict:
 
     return market_targets
 
-def generate_forecasts(processed_df: pd.DataFrame, assets: tuple, tech_info: tuple) -> dict:
+def generate_forecasts(df: pd.DataFrame, ticker: str, interval: str, horizons: dict, assets: tuple) -> dict:
     scaler, features, model_folder = assets
-    interval, horizons, last_trade_date, current_price = tech_info
+    last_trade_date = df.index[-1]
 
     with open(os.path.join(model_folder, 'metadata.json'), 'r') as f:
         meta = json.load(f)
 
     with open(os.path.join(DATA_DIR, "hyperparameters.json"), "r") as f:
-        hyperparams = json.load(f)
+        hyperparams = json.load(f)[interval]
 
     forecast_results = {}
 
@@ -647,15 +656,26 @@ def generate_forecasts(processed_df: pd.DataFrame, assets: tuple, tech_info: tup
 
     # Calculate forecasts
     for step, actual_time in horizons.items():
-        hypers = hyperparams[str(step)]
         if target_dates[step] is None: continue
 
+        processed_df = df.ind.add_indicators(ticker, interval, step)
+        if len(df) < 300: continue
+
+        str_step = str(step)
+        hypers = hyperparams[str_step]
+        horizon_folder = os.path.join(model_folder, str_step)
+
         probs   = {"LSTM": 0.5, "LGBM": 0.5, "CAT": 0.5}
-        weights = {"LSTM": 0,   "LGBM": 0,   "CAT": 0}
+        weights = {"LSTM": 0.0, "LGBM": 0.0, "CAT": 0.0}
 
         # LSTM prediction
-        lstm_path = os.path.join(model_folder, "lstm_model.safetensors")
+        lstm_path = os.path.join(horizon_folder, "lstm_model.safetensors")
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        brain_params = {
+            "hidden_dim": hypers["LSTM"]["best_params"].get("module__hidden_dim", 64),
+            "num_layers": hypers["LSTM"]["best_params"].get("module__num_layers", 2),
+            "dropout": hypers["LSTM"]["best_params"].get("module__dropout", 0.2),
+        }
 
         recent_data = processed_df[features].tail(30)
         scaled_seq = scaler.transform(recent_data)
@@ -664,7 +684,7 @@ def generate_forecasts(processed_df: pd.DataFrame, assets: tuple, tech_info: tup
         brain = LSTMBrain(
             input_dim=len(features),
             output_dim=3,
-            **hypers["LSTM"]["best_params"]
+            **brain_params
         )
         state_dict = load_file(lstm_path)
         brain.load_state_dict(state_dict)
@@ -677,14 +697,14 @@ def generate_forecasts(processed_df: pd.DataFrame, assets: tuple, tech_info: tup
             probs["LSTM"] = float((p_lstm[2] - p_lstm[0] + 1) / 2)
 
         # LGBM prediction
-        lgbm_path = os.path.join(model_folder, "lgbm_model.txt")
+        lgbm_path = os.path.join(horizon_folder, "lgbm_model.txt")
         scaled_row = scaler.transform(processed_df[features].iloc[-1:])
         booster = LGBMBooster(model_file=lgbm_path)
         p_lgbm = booster.predict(scaled_row)[0]
         probs["LGBM"] = float((p_lgbm[2] - p_lgbm[0] + 1) / 2)
 
         # CAT prediction
-        cat_path = os.path.join(model_folder, "cat_model.joblib")
+        cat_path = os.path.join(horizon_folder, "cat_model.joblib")
         scaled_row = scaler.transform(processed_df[features].iloc[-1:])
         cat_model = joblib.load(cat_path)
         p_cat = cat_model.predict_proba(scaled_row)[0]
@@ -692,21 +712,23 @@ def generate_forecasts(processed_df: pd.DataFrame, assets: tuple, tech_info: tup
 
         # Calculate weights
         for m_type in ["LSTM", "LGBM", "CAT"]:
-            model_meta = meta.get("models", {}).get(m_type, {})
-            ticker_sharpe = abs(model_meta.get("sharpe", 0.0))
-            ticker_accuracy = model_meta.get("accuracy", 0.0)
-            results_weight = {"LGBM": 0.33, "Cat": 0.33, "LSTM": 0.34}.get(m_type, 0.33)
+            model_meta = meta.get("model_results", {}).get(str_step, {}).get(m_type, {})
+            results_weight = {"LGBM": 0.33, "Cat": 0.33, "LSTM": 0.33}.get(m_type, 0.33)
 
-            weights[m_type] = (results_weight * 0.5) + (ticker_sharpe * 0.3) + (ticker_accuracy * 0.2)
+            sharpe     =  max(0.0, model_meta.get("sharpe", 0.0))
+            wf_sharpe  =  max(0.0, model_meta.get("wf_sharpe", 0.0))
+            acc        =  max(0.0, model_meta.get("accuracy", 0.0) - 0.33)
+
+            weights[m_type] = (results_weight * 0.0) + (wf_sharpe * 0.5) + (sharpe * 0.3) + (acc * 0.2)
 
         total_weight = sum(weights.values())
         avg_proba = sum(probs[m] * weights[m] for m in probs) / total_weight if total_weight > 0 else 0.5
 
         # Calculate predicted target bounds
-        forecast_results[step] = {
+        forecast_results[str_step] = {
             "Start_Date":     last_trade_date.strftime("%Y-%m-%d %H:%M"),
             "End_Date":       target_dates[step].strftime("%Y-%m-%d %H:%M"),
-            "Current_Price":  current_price,
+            "Current_Price":  float(df['Adj Close'].iloc[-1]),
             'AVG_signal':     avg_proba,
             'CAT_signal':     probs["CAT"],
             'LGBM_signal':    probs["LGBM"],

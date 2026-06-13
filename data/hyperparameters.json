@@ -19,7 +19,7 @@
                     "reg_lambda": 0.0003300772417950808,
                     "objective": "multiclass",
                     "num_class": 3,
-                    "class_weight": "balanced",
+                    "class_weight": "balanced"
                 }
             },
             "CAT": {
@@ -36,7 +36,7 @@
                     "random_strength": 9.202511677153058,
                     "bagging_temperature": 0.67371251916518,
                     "loss_function": "MultiClass",
-                    "auto_class_weights": "Balanced",
+                    "auto_class_weights": "Balanced"
                 }
             },
             "LSTM": {
@@ -76,7 +76,7 @@
                     "reg_lambda": 0.0004029208178018687,
                     "objective": "multiclass",
                     "num_class": 3,
-                    "class_weight": "balanced",
+                    "class_weight": "balanced"
                 }
             },
             "CAT": {
@@ -93,7 +93,7 @@
                     "random_strength": 1.432707749718444e-09,
                     "bagging_temperature": 0.7954417499856705,
                     "loss_function": "MultiClass",
-                    "auto_class_weights": "Balanced",
+                    "auto_class_weights": "Balanced"
                 }
             },
             "LSTM": {
@@ -133,7 +133,7 @@
                     "reg_lambda": 0.018947864215173513,
                     "objective": "multiclass",
                     "num_class": 3,
-                    "class_weight": "balanced",
+                    "class_weight": "balanced"
                 }
             },
             "CAT": {
@@ -150,7 +150,7 @@
                     "random_strength": 0.00038756278009771265,
                     "bagging_temperature": 0.6828253872400678,
                     "loss_function": "MultiClass",
-                    "auto_class_weights": "Balanced",
+                    "auto_class_weights": "Balanced"
                 }
             },
             "LSTM": {
@@ -190,7 +190,7 @@
                     "reg_lambda": 3.5926498971780056e-08,
                     "objective": "multiclass",
                     "num_class": 3,
-                    "class_weight": "balanced",
+                    "class_weight": "balanced"
                 }
             },
             "CAT": {
@@ -207,7 +207,7 @@
                     "random_strength": 1.5923553403341646e-05,
                     "bagging_temperature": 0.8118524206837423,
                     "loss_function": "MultiClass",
-                    "auto_class_weights": "Balanced",
+                    "auto_class_weights": "Balanced"
                 }
             },
             "LSTM": {
@@ -249,7 +249,7 @@
                     "reg_lambda": 1.2050060963906081e-05,
                     "objective": "multiclass",
                     "num_class": 3,
-                    "class_weight": "balanced",
+                    "class_weight": "balanced"
                 }
             },
             "CAT": {
@@ -266,7 +266,7 @@
                     "random_strength": 7.989479385459395,
                     "bagging_temperature": 0.2761781732466797,
                     "loss_function": "MultiClass",
-                    "auto_class_weights": "Balanced",
+                    "auto_class_weights": "Balanced"
                 }
             },
             "LSTM": {
@@ -306,7 +306,7 @@
                     "reg_lambda": 1.0864112924518945,
                     "objective": "multiclass",
                     "num_class": 3,
-                    "class_weight": "balanced",
+                    "class_weight": "balanced"
                 }
             },
             "CAT": {
@@ -323,7 +323,7 @@
                     "random_strength": 1.7681977431793627,
                     "bagging_temperature": 0.2562700843977862,
                     "loss_function": "MultiClass",
-                    "auto_class_weights": "Balanced",
+                    "auto_class_weights": "Balanced"
                 }
             },
             "LSTM": {
@@ -363,7 +363,7 @@
                     "reg_lambda": 9.422048542398773,
                     "objective": "multiclass",
                     "num_class": 3,
-                    "class_weight": "balanced",
+                    "class_weight": "balanced"
                 }
             },
             "CAT": {
@@ -380,7 +380,7 @@
                     "random_strength": 0.7806419884546848,
                     "bagging_temperature": 0.8544623492822168,
                     "loss_function": "MultiClass",
-                    "auto_class_weights": "Balanced",
+                    "auto_class_weights": "Balanced"
                 }
             },
             "LSTM": {
@@ -420,7 +420,7 @@
                     "reg_lambda": 6.747632314362143e-05,
                     "objective": "multiclass",
                     "num_class": 3,
-                    "class_weight": "balanced",
+                    "class_weight": "balanced"
                 }
             },
             "CAT": {
@@ -437,7 +437,7 @@
                     "random_strength": 7.718864821217508e-05,
                     "bagging_temperature": 0.1624452578031882,
                     "loss_function": "MultiClass",
-                    "auto_class_weights": "Balanced",
+                    "auto_class_weights": "Balanced"
                 }
             },
             "LSTM": {
