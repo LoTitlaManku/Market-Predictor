@@ -12,13 +12,13 @@ class TechnicalAnalysisAccessor:
     def __init__(self, pandas_obj: pd.DataFrame):
         self._obj = pandas_obj
 
-    def add_indicators(self, interval: str, horizon: int = 4) -> pd.DataFrame:
+    def add_indicators(self, ticker: str, interval: str, horizon: int = 4) -> pd.DataFrame:
         df = self._obj
         df.index = df.index.astype('datetime64[ms]')
 
         # Add all indicators
-        df = self._add_sentiment(df)
-        df = self._add_technical_indicators(df)
+        df = self._add_sentiment(df, ticker)
+        df = self._add_technical_indicators(df, interval)
         df = self._add_vix(df, interval)
         df = self._add_vix_plus(df, interval)
         df = self._add_macro_context(df, interval)
@@ -30,16 +30,19 @@ class TechnicalAnalysisAccessor:
         return df.dropna()
 
     @staticmethod
-    def _add_sentiment(df: pd.DataFrame) -> pd.DataFrame:
+    def _add_sentiment(df: pd.DataFrame, ticker: str) -> pd.DataFrame:
         target_file = os.path.join(DATA_DIR, f"master_sentiment.parquet")
 
-        global_sent = pd.read_parquet(target_file)
-        global_sent['event_date'] = pd.to_datetime(global_sent['event_date'])
+        sent_df = pd.read_parquet(target_file, filters=[('ticker', '==', ticker)])
+        if len(sent_df) < 300:
+            global_sent = pd.read_parquet(target_file)
+            global_sent['event_date'] = pd.to_datetime(global_sent['event_date'])
 
-        sent_df = global_sent.groupby('event_date').agg({
-            'avg_tone': 'mean',  # Average mood across all companies
-            'article_count': 'sum'  # Total news volume for the whole market
-        }).reset_index()
+            sent_df = global_sent.groupby('event_date').agg({
+                'avg_tone': 'mean',  # Average mood across all companies
+                'article_count': 'sum'  # Total news volume for the whole market
+            }).reset_index()
+
         sent_df = sent_df.sort_values('event_date')
 
         # Sentiment Impact: tone * log(count + 1)
@@ -83,7 +86,7 @@ class TechnicalAnalysisAccessor:
         return df
 
     @staticmethod
-    def _add_technical_indicators(df: pd.DataFrame):
+    def _add_technical_indicators(df: pd.DataFrame, interval: str):
         df['return'] = df['Adj Close'].pct_change()
         for i in range(1, 4): df[f'return_lag_{i}'] = df['return'].shift(i)
 
@@ -133,10 +136,44 @@ class TechnicalAnalysisAccessor:
         df['Kalman_Price'] = get_kalman_filter(df['Close'])
         df['Kalman_Dev'] = (df['Close'] - df['Kalman_Price']) / df['Kalman_Price']  # Deviation from "True" price
 
+        # Garman-Klass Volatility
+        df['GK_vol'] = np.sqrt(
+            0.5 * np.log(df['High'] / df['Low']) ** 2
+            - (2 * np.log(2) - 1) * np.log(df['Close'] / df['Open']) ** 2
+        ).rolling(20).mean()
+
+        # Overnight Gap
+        df['overnight_gap'] = (df['Open'] - df['Close'].shift(1)) / df['Close'].shift(1)
+
+        # Distance from N-period high/low
+        lookback_52w = 252 if interval == "1d" else 1638
+        df['dist_from_52w_high'] = (df['Close'] / df['Close'].rolling(lookback_52w).max()) - 1
+        df['dist_from_52w_low'] = (df['Close'] / df['Close'].rolling(lookback_52w).min()) - 1
+
+        # Return skewness and kurtosis
+        df['return_skew_20'] = df['return'].rolling(20).skew()
+        df['return_kurt_20'] = df['return'].rolling(20).kurt()
+        df['return_skew_60'] = df['return'].rolling(60).skew()
+
+        # Multiple-period PDMA
+        df['PDMA_50'] = (df['Close'] / talib.SMA(df['Adj Close'], 50)) - 1
+        df['PDMA_20'] = (df['Close'] / talib.SMA(df['Adj Close'], 20)) - 1
+
+        # Stochastic %%
+        df['Stoch_K'], df['Stoch_D'] = talib.STOCH(df['High'], df['Low'], df['Close'])
+
+        # Volume Rate of Change
+        df['VROC_10'] = talib.ROC(df['Volume'], timeperiod=10)
+
+        # Multi-period momentum returns
+        df['mom_1m'] = df['Close'].pct_change(21).shift(1)
+        df['mom_3m'] = df['Close'].pct_change(63).shift(1)
+        df['mom_6m'] = df['Close'].pct_change(126).shift(1)
+
         # Efficiency ratio
         price_diff = df['Close'].diff(20).abs()
         volatility = df['Close'].diff().abs().rolling(20).sum()
-        df['Efficiency_Ratio'] = price_diff / volatility  # 1.0 = Strong Trend, 0.0 = Choppy/Noisy
+        df['Efficiency_Ratio'] = price_diff / volatility
 
         # Other indicators
         df['vol_ratio'] = df['return'].rolling(5).std() / df['return'].rolling(50).std()
@@ -154,10 +191,8 @@ class TechnicalAnalysisAccessor:
         # Calculate future returns over the given horizon window
         tbm_returns = (df['Adj Close'].shift(-horizon) / df['Adj Close']) - 1
 
-        # Use a rolling window of PAST realized returns to define the barriers (No lookahead bias)
         if interval == "1d": bars = 252
         elif interval == "1h": bars = 1638
-        elif interval == "15m": bars = 6552
         else: raise ValueError("Invalid interval")
 
         historical_returns = df['Adj Close'].pct_change(horizon)
@@ -167,14 +202,12 @@ class TechnicalAnalysisAccessor:
 
         labels = np.zeros(len(df))
 
-        # Assign labels based on quantiles
         labels[tbm_returns >= upper_barrier] = 1
         labels[tbm_returns <= lower_barrier] = -1
 
         df['target_profit'] = labels.astype(int)
         df['tbm_return'] = tbm_returns.fillna(0)
 
-        # Filter out rows where rolling barriers are not yet calculated or future horizon is missing
         df = df.iloc[:-horizon]
         valid_idx = upper_barrier.dropna().index.intersection(df.index)
 

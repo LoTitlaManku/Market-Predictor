@@ -26,12 +26,12 @@ warnings.filterwarnings("ignore")
 NYSE_CAL = mcal.get_calendar('NYSE')
 
 # Custom imports
-from scripts.config import DATA_DIR
+from scripts.config import DATA_DIR, HYPER_DIR
 import scripts.indicators_tuning # noqa
 
 class Settings:
-    VERBOSE = 1 # Set whether to display logging or not
-    GPU     = True
+    VERBOSE = 0
+    GPU = {"LGBM": True, "CAT": True, "LSTM": True}
 
 def flush_memory():
     gc.collect()
@@ -108,23 +108,79 @@ class TrainingManager:
         self.returns_train = None
         self.returns_test = None
 
-    def _prepare_data(self, df: pd.DataFrame):
+        self.lstm_x_train = None
+        self.lstm_y_train = None
+        self.lstm_ret_train = None
+        self.lstm_x_test = None
+        self.lstm_y_test = None
+        self.lstm_ret_test = None
+
+        self.feature_cols = None
+        self.scaler = None
+
+    def _prepare_data(self, dfs_dict: dict):
+        first_df = list(dfs_dict.values())[0]
         drop_cols = ['Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume', 'MA_200', 'return', 'target_profit', 'tbm_return']
-        feature_cols = [c for c in df.columns if c not in drop_cols]
+        self.feature_cols = [c for c in first_df.columns if c not in drop_cols]
 
-        # Partition the fully processed data
-        split_idx = int(len(df) * (1 - self.__test_size))
-        train_df, test_df = df.iloc[:split_idx], df.iloc[split_idx:]
+        train_dfs_dict = {}
+        test_dfs_dict = {}
+        train_raw_list = []
 
-        X_train_raw = train_df[feature_cols].values
-        X_test_raw = test_df[feature_cols].values
+        # 1. Split each ticker, collect raw train to fit the global scaler
+        for ticker, df in dfs_dict.items():
+            split_idx = int(len(df) * (1 - self.__test_size))
+            train_df = df.iloc[:split_idx].copy()
+            test_df = df.iloc[split_idx:].copy()
 
-        self.y_train,       self.y_test       = train_df['target_profit'],     test_df['target_profit']
-        self.returns_train, self.returns_test = train_df['tbm_return'].values, test_df['tbm_return'].values
+            train_dfs_dict[ticker] = train_df
+            test_dfs_dict[ticker] = test_df
+            train_raw_list.append(train_df[self.feature_cols].values)
 
-        scaler = StandardScaler()
-        self.X_train = scaler.fit_transform(X_train_raw)
-        self.X_test = scaler.transform(X_test_raw)
+        self.scaler = StandardScaler()
+        self.scaler.fit(np.vstack(train_raw_list))
+
+        # 2. Pool and Time-Sort 2D Data for Tree Models
+        train_df_concat = pd.concat(train_dfs_dict.values()).sort_index()
+        test_df_concat = pd.concat(test_dfs_dict.values()).sort_index()
+
+        self.X_train = self.scaler.transform(train_df_concat[self.feature_cols].values)
+        self.X_test = self.scaler.transform(test_df_concat[self.feature_cols].values)
+        self.y_train = train_df_concat['target_profit']
+        self.y_test = test_df_concat['target_profit']
+        self.returns_train = train_df_concat['tbm_return'].values
+        self.returns_test = test_df_concat['tbm_return'].values
+
+        # 3. Process 3D Sequences Safely per Ticker for LSTM
+        x_tr_list, y_tr_list, ret_tr_list, dt_tr_list = [], [], [], []
+        x_te_list, y_te_list, ret_te_list, dt_te_list = [], [], [], []
+
+        for ticker in dfs_dict.keys():
+            train_df = train_dfs_dict[ticker]
+            test_df = test_dfs_dict[ticker]
+
+            # Sequence training set
+            x3_tr, y_tr, r_tr, d_tr = self.create_3d_sequences(train_df, self.feature_cols, self.scaler, window=30)
+            x_tr_list.append(x3_tr); y_tr_list.append(y_tr); ret_tr_list.append(r_tr); dt_tr_list.append(d_tr)
+
+            # Pad test set with last 30 days of train set so we don't lose the first month of test predictions
+            padded_test_df = pd.concat([train_df.iloc[-30:], test_df])
+            x3_te, y_te, r_te, d_te = self.create_3d_sequences(padded_test_df, self.feature_cols, self.scaler, window=30)
+            x_te_list.append(x3_te); y_te_list.append(y_te); ret_te_list.append(r_te); dt_te_list.append(d_te)
+
+        # Combine and Time-Sort Train Sequences
+        all_dts_tr = np.concatenate(dt_tr_list)
+        sort_idx_tr = np.argsort(all_dts_tr)
+        self.lstm_x_train = np.concatenate(x_tr_list)[sort_idx_tr]
+        self.lstm_y_train = np.concatenate(y_tr_list)[sort_idx_tr]
+        self.lstm_ret_train = np.concatenate(ret_tr_list)[sort_idx_tr]
+
+        # Combine and Time-Sort Test Sequences
+        all_dts_te = np.concatenate(dt_te_list)
+        sort_idx_te = np.argsort(all_dts_te)
+        self.lstm_x_test = np.concatenate(x_te_list)[sort_idx_te]
+        self.lstm_y_test = np.concatenate(y_te_list)[sort_idx_te]
+        self.lstm_ret_test = np.concatenate(ret_te_list)[sort_idx_te]
 
     @staticmethod
     def evaluate_performance(interval: str, actual: np.ndarray, predicted: np.ndarray, actual_returns: np.ndarray) -> tuple:
@@ -134,21 +190,31 @@ class TrainingManager:
 
         acc = accuracy_score(actual, predicted)
 
-        # Strategy return aligns with the direction predicted:
-        # Long (1) gets the path return, Short (-1) gets inverted path return, Hold (0) gets 0
-        strategy_returns = np.nan_to_num(actual_returns * predicted)
+        if interval == "1d": bars = 252
+        elif interval == "1h": bars = 1638
+        else: raise ValueError("Interval length not valid.")
 
-        if len(strategy_returns) < 2 or np.std(strategy_returns) == 0:
-            sharpe = 0.0
-        else:
-            if interval == "1d": bars = 252
-            elif interval == "1h": bars = 1638
-            else: raise NotImplementedError("Interval length not implemented yet.")
+        # Calculate custom utility scorecard returns
+        # Base logic: Strategy return aligns with direction predicted
+        custom_scores = np.nan_to_num(actual_returns * predicted)
 
-            sharpe = np.mean(strategy_returns) / (np.std(strategy_returns) + 1e-9) * np.sqrt(bars)
+        # Rule 1: Symmetrical breakout errors (Actual was a trend, but prediction was perfectly backwards)
+        opposite_mask = (actual != 0) & (predicted == -actual)
+        custom_scores[opposite_mask] = 2.0 * custom_scores[opposite_mask]
+
+        # Rule 2: Drift errors during Hold periods (Actual was 0, but model took a position that bled money)
+        hold_wrong_mask = (actual == 0) & (custom_scores < 0)
+        custom_scores[hold_wrong_mask] = 2.0 * custom_scores[hold_wrong_mask]
+
+        # Rule 3: Reward the model for correctly flatlining/holding when it should have
+        hold_right_mask = (actual == 0) & (predicted == 0)
+        custom_scores[hold_right_mask] = np.abs(actual_returns[hold_right_mask]).mean() * 0.1
+
+        # Annualize the performance score card
+        util_score = (np.mean(custom_scores) / (np.std(custom_scores) + 1e-9)) * np.sqrt(bars)
 
         # Calculate stability
-        cumulative_returns = np.cumsum(strategy_returns)
+        cumulative_returns = np.cumsum(custom_scores)
         if len(cumulative_returns) > 1:
             x = np.arange(len(cumulative_returns))
             slope, intercept, r_value, p_value, std_err = stats.linregress(x, cumulative_returns)
@@ -156,17 +222,24 @@ class TrainingManager:
         else:
             stability = 0.0
 
-        return acc, sharpe, stability
+        return acc, util_score, stability
 
     @staticmethod
-    def create_3d_sequences(data: np.ndarray, targets: np.ndarray, window: int = 30) -> tuple:
-        x, y = [], []
+    def create_3d_sequences(df: pd.DataFrame, feature_cols: list, scaler: StandardScaler, window: int = 30) -> tuple:
+        data = scaler.transform(df[feature_cols].values)
+        targets = df['target_profit'].values
+        returns = df['tbm_return'].values
+        dates = df.index.values
+
+        x, y, rets, dts = [], [], [], []
         for i in range(len(data) - window):
             x.append(data[i: i + window])
             y.append(targets[i + window])
-        return np.array(x, dtype=np.float32), np.array(y)
+            rets.append(returns[i + window])
+            dts.append(dates[i + window])
 
-    # Train and tune LightGBM with walk-forward validation
+        return np.array(x, dtype=np.float32), np.array(y), np.array(rets), np.array(dts)
+
     def _train_lightgbm(self, interval: str, horizon: int) -> dict:
         y_train_shifted = self.y_train + 1
         tscv = PurgedTimeSeriesSplit(n_splits=3, gap=horizon, embargo_pct=0.01)
@@ -188,8 +261,8 @@ class TrainingManager:
                 'num_class': 3,
                 'class_weight': 'balanced',
                 'verbose': -1,
-                'n_jobs': -1,  # Maximize local CPU efficiency
-                'device_type': 'gpu' if Settings.GPU else "cpu"
+                'n_jobs': -1,
+                'device_type': 'gpu' if Settings.GPU["LGBM"] else "cpu"
             }
 
             model = LGBMClassifier(**params)
@@ -199,15 +272,13 @@ class TrainingManager:
                 model.fit(self.X_train[train_idx], y_train_shifted.iloc[train_idx])
                 preds = model.predict(self.X_train[val_idx]) - 1
 
-                # Penalize models that take zero trades to close the safe haven loophole
                 if np.all(preds == 0):
-                    local_sharpe = -1.0
+                    local_util = -1.0
                 else:
-                    # Optimize for Sharpe Ratio
-                    _, local_sharpe, _ = self.evaluate_performance(
+                    _, local_util, _ = self.evaluate_performance(
                         interval, self.y_train.iloc[val_idx].values, preds, self.returns_train[val_idx]
                     )
-                scores.append(local_sharpe)
+                scores.append(local_util)
             return np.mean(scores)
 
         study = optuna.create_study(direction="maximize")
@@ -224,23 +295,17 @@ class TrainingManager:
         best_model.fit(self.X_train, y_train_shifted)
 
         test_preds = best_model.predict(self.X_test) - 1
+        accuracy, util_score, stability = self.evaluate_performance(interval, self.y_test.values, test_preds, self.returns_test)
 
-        # print("Long:", np.mean(test_preds == 1))    # noqa
-        # print("Short:", np.mean(test_preds == -1))  # noqa
-        # print("Hold:", np.mean(test_preds == 0))    # noqa
-        # print(confusion_matrix(self.y_test, test_preds))
-
-        accuracy, sharpe, stability = self.evaluate_performance(interval, self.y_test.values, test_preds, self.returns_test)
         return {
             'model_type': 'LGBM',
             'accuracy': accuracy,
-            'wf_sharpe': study.best_value,
-            'sharpe': sharpe,
+            'wf_util_score': study.best_value,
+            'util_score': util_score,
             'stability': stability,
             'best_params': best_params
         }
 
-    # Train and tune CatBoost with walk-forward validation
     def _train_catboost(self, interval: str, horizon: int) -> dict:
         y_train_shifted = self.y_train + 1
         tscv = PurgedTimeSeriesSplit(n_splits=3, gap=horizon, embargo_pct=0.01)
@@ -256,7 +321,7 @@ class TrainingManager:
                 'bagging_temperature': trial.suggest_float('bagging_temperature', 0.0, 1.0),
                 'loss_function': 'MultiClass',
                 'auto_class_weights': 'Balanced',
-                'task_type': "CPU",
+                'task_type': "GPU" if Settings.GPU["CAT"] else "CPU",
                 'verbose': False,
                 'random_state': self.seed
             }
@@ -266,20 +331,18 @@ class TrainingManager:
 
             for train_idx, val_idx in tscv.split(self.X_train):
                 if y_train_shifted.iloc[train_idx].nunique() <= 1:
-                    local_sharpe = -1.0
+                    local_util = -1.0
                 else:
                     model.fit(self.X_train[train_idx], y_train_shifted.iloc[train_idx])
                     preds = model.predict(self.X_train[val_idx]).flatten() - 1
 
-                    # Penalize models that take zero trades to close the safe haven loophole
                     if np.all(preds == 0):
-                        local_sharpe = -1.0
+                        local_util = -1.0
                     else:
-                        # Optimize for Sharpe Ratio
-                        _, local_sharpe, _ = self.evaluate_performance(
+                        _, local_util, _ = self.evaluate_performance(
                             interval, self.y_train.iloc[val_idx].values, preds, self.returns_train[val_idx]
                         )
-                scores.append(local_sharpe)
+                scores.append(local_util)
             return np.mean(scores)
 
         study = optuna.create_study(direction="maximize")
@@ -288,10 +351,9 @@ class TrainingManager:
         best_params = study.best_params.copy()
         best_params.update({
             'loss_function': 'MultiClass', 'auto_class_weights': 'Balanced',
-            'task_type': "CPU", 'verbose': False, 'random_state': self.seed
+            'task_type': "GPU" if Settings.GPU else "CPU", 'verbose': False, 'random_state': self.seed
         })
 
-        # Safeguard final training if the entire dataset contains only one class
         if y_train_shifted.nunique() <= 1:
             unique_val = y_train_shifted.iloc[0]
             test_preds = np.full(len(self.X_test), unique_val - 1)
@@ -300,41 +362,26 @@ class TrainingManager:
             best_model.fit(self.X_train, y_train_shifted)
             test_preds = best_model.predict(self.X_test).flatten() - 1
 
-        # print("Long:", np.mean(test_preds == 1))    # noqa
-        # print("Short:", np.mean(test_preds == -1))  # noqa
-        # print("Hold:", np.mean(test_preds == 0))    # noqa
-        # print(confusion_matrix(self.y_test, test_preds))
+        accuracy, util_score, stability = self.evaluate_performance(interval, self.y_test.values, test_preds, self.returns_test)
 
-        accuracy, sharpe, stability = self.evaluate_performance(interval, self.y_test.values, test_preds, self.returns_test)
         return {
             'model_type': 'CAT',
             'accuracy': accuracy,
-            'wf_sharpe': study.best_value,
-            'sharpe': sharpe,
+            'wf_util_score': study.best_value,
+            'util_score': util_score,
             'stability': stability,
             'best_params': best_params
         }
 
-    # Train and tune LSTM with walk-forward validation
     def _train_lstm(self, interval: str, horizon: int) -> dict:
-        window = 30
-        X_test_padded = np.vstack((self.X_train[-window:], self.X_test))
-        y_test_padded = np.concatenate((self.y_train.values[-window:], self.y_test.values))
+        y_train_shifted = (self.lstm_y_train + 1).astype(np.int64)
+        input_dim = self.lstm_x_train.shape[2]
 
-        x_train_3d, y_train_seq = self.create_3d_sequences(self.X_train, self.y_train.values, window=window)
-        x_test_3d, y_test_seq = self.create_3d_sequences(X_test_padded, y_test_padded, window=window)
-
-        y_train_shifted = (y_train_seq + 1).astype(np.int64)
-        returns_train_seq = self.returns_train[window:]
-        input_dim = x_train_3d.shape[2]
-
-        # Calculate exact class weights to prevent the LSTM from ignoring minority classes
         classes = np.unique(y_train_shifted)
         weights = compute_class_weight('balanced', classes=classes, y=y_train_shifted)
         weight_tensor = torch.tensor(weights, dtype=torch.float).to('cuda' if torch.cuda.is_available() else 'cpu')
 
-        # Use our custom Purged & Embargoed split for accurate financial evaluation
-        tscv = PurgedTimeSeriesSplit(n_splits=2, gap=window+horizon, embargo_pct=0.01)
+        tscv = PurgedTimeSeriesSplit(n_splits=2, gap=30+horizon, embargo_pct=0.01)
         optuna.logging.set_verbosity(optuna.logging.WARNING)
 
         def objective(trial):
@@ -347,7 +394,7 @@ class TrainingManager:
             batch_size = trial.suggest_categorical('batch_size', [16, 32, 64])
             optimizer_name = trial.suggest_categorical('optimizer_name', ["Adam", "AdamW", "RMSprop"])
 
-            optimizers = {"Adam": torch.optim.Adam, "AdamW": torch.optim.AdamW, "RMSprop": torch.optim.RMSprop} # noqa
+            optimizers = {"Adam": torch.optim.Adam, "AdamW": torch.optim.AdamW, "RMSprop": torch.optim.RMSprop}
 
             def build_model():
                 return NeuralNetClassifier(
@@ -372,20 +419,18 @@ class TrainingManager:
                 )
 
             scores = []
-            for train_idx, val_idx in tscv.split(x_train_3d):
+            for train_idx, val_idx in tscv.split(self.lstm_x_train):
                 model = build_model()
-                model.fit(x_train_3d[train_idx], y_train_shifted[train_idx])
-                preds = model.predict(x_train_3d[val_idx]) - 1
+                model.fit(self.lstm_x_train[train_idx], y_train_shifted[train_idx])
+                preds = model.predict(self.lstm_x_train[val_idx]) - 1
 
-                # Penalize models that take zero trades to close the safe haven loophole
                 if np.all(preds == 0):
-                    local_sharpe = -1.0
+                    local_util = -1.0
                 else:
-                    # Optimize for Sharpe Ratio
-                    _, local_sharpe, _ = self.evaluate_performance(
-                        interval, y_train_seq[val_idx], preds, returns_train_seq[val_idx]
+                    _, local_util, _ = self.evaluate_performance(
+                        interval, self.lstm_y_train[val_idx], preds, self.lstm_ret_train[val_idx]
                     )
-                scores.append(local_sharpe)
+                scores.append(local_util)
             return np.mean(scores)
 
         study = optuna.create_study(direction="maximize")
@@ -409,67 +454,73 @@ class TrainingManager:
             **best_params
         )
 
-        final_model.fit(x_train_3d, y_train_shifted)
-        test_preds = final_model.predict(x_test_3d) - 1
+        final_model.fit(self.lstm_x_train, y_train_shifted)
+        test_preds = final_model.predict(self.lstm_x_test) - 1
 
-        # print("Long:", np.mean(test_preds == 1))    # noqa
-        # print("Short:", np.mean(test_preds == -1))  # noqa
-        # print("Hold:", np.mean(test_preds == 0))    # noqa
-        # print(confusion_matrix(self.y_test, test_preds))
-
-        returns_test_seq = np.concatenate((self.returns_train[-window:], self.returns_test))[window:]
-        accuracy, sharpe, stability = self.evaluate_performance(interval, y_test_seq, test_preds, returns_test_seq)
+        accuracy, util_score, stability = self.evaluate_performance(
+            interval, self.lstm_y_test, test_preds, self.lstm_ret_test
+        )
 
         best_params['optimizer_name'] = opt_name
         return {
             'model_type': 'LSTM',
             'accuracy': accuracy,
-            'wf_sharpe': study.best_value,
-            'sharpe': sharpe,
+            'wf_util_score': study.best_value,
+            'util_score': util_score,
             'stability': stability,
             'best_params': best_params
         }
 
     # Run all helper functions and consolidate the best model
-    def run_training_pipeline(self, interval) -> bool:
-        data = pd.read_parquet(os.path.join(DATA_DIR, f"SPY_{interval}.parquet"))
-        if data is None: print("No data"); return False
+    def run_training_pipeline(self, profile_name: str, interval: str) -> bool:
+        profile_path = os.path.join(HYPER_DIR, profile_name)
+        if not os.path.exists(profile_path):
+            print(f"Profile directory not found: {profile_path}")
+            return False
 
-        all_horizons = {
-            "15m": {2: 0.5,  4: 1,  8: 2,    13: 3.25},  # bars: hours
-            "1h":  {1: 1,    2: 2,  4: 4,    8: 25},     # bars: hours
-            "1d":  {1: 1,    4: 4,  10: 14,  20: 28}     # bars: days
-        }
-        horizons = all_horizons[interval]
+        # Load all tickers within that profile folder
+        tickers = [f.split('_')[0] for f in os.listdir(profile_path) if f.endswith(f"_{interval}.parquet")]
+        if not tickers:
+            print(f"No valid .parquet files found for interval {interval} in {profile_path}")
+            return False
 
         def save():
-            with open(f"results/tuned_results_{interval}.json", "w") as f:
+            with open(f"results/tuned_{profile_name}_{interval}.json", "w") as f:
                 json.dump(results, f, indent=4)
 
         results = {}
-        for horizon in horizons.keys():
-            print(f"Adding features ({horizon})...")
-            df = data.ind.add_indicators(interval, horizon)
-            if len(df) < 300:
-                print(f"Insufficient data (need 300+, got {len(df)})")
-                return False
+        for horizon in [2,4,8]:
+            dfs_dict = {}
+            for ticker in tickers:
+                data = pd.read_parquet(os.path.join(profile_path, f"{ticker}_{interval}.parquet"))
 
-            print("Scaling features...")
-            self._prepare_data(df)
-            results[horizon] = {}
+                df = data.ind.add_indicators(ticker, interval, horizon)
+                if len(df) >= 300:
+                    dfs_dict[ticker] = df
+                else:
+                    print(f"Insufficient data for {ticker} (need 300+, got {len(df)})")
+
+            if not dfs_dict:
+                print(f"Insufficient pooled data across all tickers for horizon {horizon}.")
+                continue
+
+            print(f"Scaling and pooling features ({horizon})...")
+            self._prepare_data(dfs_dict)
+            str_hor = str(horizon)
+            results[str_hor] = {}
 
             print("Tuning LightGBM...")
-            results[horizon]["LGBM"] = self._train_lightgbm(interval, horizon)
+            results[str_hor]["LGBM"] = self._train_lightgbm(interval, horizon)
             flush_memory()
             save()
 
             print("Tuning CatBoost...")
-            results[horizon]["CAT"]  = self._train_catboost(interval, horizon)
+            results[str_hor]["CAT"]  = self._train_catboost(interval, horizon)
             flush_memory()
             save()
 
             print("Tuning LSTM...")
-            results[horizon]["LSTM"] = self._train_lstm(interval, horizon)
+            results[str_hor]["LSTM"] = self._train_lstm(interval, horizon)
             flush_memory()
             save()
 
@@ -479,8 +530,9 @@ class TrainingManager:
 if __name__ == "__main__":
     start = time.perf_counter()
     m = TrainingManager()
-    for inter in ["1h", "1d"]:
-        m.run_training_pipeline(inter)
+    for prof in ["Profile A", "Profile B", "Profile C", "Profile D", "Profile E", "Profile F"]:
+        for inter in ["1h", "1d"]:
+            m.run_training_pipeline(prof, inter)
 
     end = time.perf_counter()
     print(f"Time: {end-start}s")
