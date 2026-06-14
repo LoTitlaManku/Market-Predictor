@@ -339,7 +339,7 @@ class TrainingManager:
         with open(os.path.join(DATA_DIR, "ticker_attr.json"), "r") as f:
             ticker_map = json.load(f)
 
-        ticker_list = sorted(set(ticker_map.keys()))#[:50]
+        ticker_list = sorted(set(ticker_map.keys()))[:100]
         # self.config.edge_q = min(self.config.edge_q * len(ticker_list), self.config.max_top_tickers) / len(ticker_list)
 
         benchmark_raw = pd.read_parquet(os.path.join(DATA_DIR, f"SPY_{interval}.parquet"))
