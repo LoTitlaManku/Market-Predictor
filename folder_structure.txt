@@ -1,0 +1,80 @@
+market_predictor
+├── TODO
+├── data
+│   ├── SPY_1d.parquet
+│   ├── SPY_1h.parquet
+│   ├── TYX_1d.parquet
+│   ├── TYX_1h.parquet
+│   ├── VIX_1d.parquet
+│   ├── VIX_1h.parquet
+│   ├── VVIX_1d.parquet
+│   ├── VVIX_1h.parquet
+│   ├── master_sentiment.parquet
+│   ├── ticker_map.json
+│   └── valid_tickers_with_history.json
+├── ledgers
+├── models
+│   └── Profile A (1d)
+├── requirements.txt
+├── run.py
+├── scripts
+│   ├── analysis.py
+│   ├── config.py
+│   ├── custom_widgets.py
+│   ├── data_management.py
+│   ├── default_gui.py
+│   ├── graph.py
+│   ├── hyperparameter_tuning.py
+│   ├── indicators.py
+│   ├── predictor (old).py
+│   ├── predictor 1.py
+│   ├── predictor.py
+│   ├── results.py
+│   └── testing_things.py
+├── stock-profiles
+│   ├── Profile A
+│   │   ├── IWM_1d.parquet
+│   │   ├── IWM_1h.parquet
+│   │   ├── QQQ_1d.parquet
+│   │   ├── QQQ_1h.parquet
+│   │   ├── SPY_1d.parquet
+│   │   ├── SPY_1h.parquet
+│   │   ├── benchmark_1d.parquet
+│   │   ├── benchmark_1h.parquet
+│   │   └── tickers.json
+│   ├── Profile B
+│   │   ├── AAPL_1d.parquet
+│   │   ├── AAPL_1h.parquet
+│   │   ├── GOOGL_1d.parquet
+│   │   ├── GOOGL_1h.parquet
+│   │   ├── MSFT_1d.parquet
+│   │   ├── MSFT_1h.parquet
+│   │   └── tickers.json
+│   ├── Profile C
+│   │   ├── META_1d.parquet
+│   │   ├── META_1h.parquet
+│   │   ├── NVDA_1d.parquet
+│   │   ├── NVDA_1h.parquet
+│   │   └── tickers.json
+│   ├── Profile D
+│   │   ├── AMD_1d.parquet
+│   │   ├── AMD_1h.parquet
+│   │   ├── TSLA_1d.parquet
+│   │   ├── TSLA_1h.parquet
+│   │   └── tickers.json
+│   ├── Profile E
+│   │   ├── JNJ_1d.parquet
+│   │   ├── JNJ_1h.parquet
+│   │   ├── KO_1d.parquet
+│   │   ├── KO_1h.parquet
+│   │   ├── PG_1d.parquet
+│   │   ├── PG_1h.parquet
+│   │   └── tickers.json
+│   └── Profile F
+│       ├── CAT_1d.parquet
+│       ├── CAT_1h.parquet
+│       ├── JPM_1d.parquet
+│       ├── JPM_1h.parquet
+│       ├── XOM_1d.parquet
+│       ├── XOM_1h.parquet
+│       └── tickers.json

@@ -554,20 +554,93 @@ def find_dupes():
     else:
         print("\nNo duplicates found.")
 
-##############################################################################################################
+########################################################################################################################
+
+def assign_profile(vol: float, beta: float, adv: float) -> str:
+    if vol < 0.18:
+        return "A"
+
+    if 0.18 <= vol < 0.28:
+        if beta < 0.9:
+            return "E"
+        return "B" if adv > 5_000_000 else "F"
+
+    if 0.28 <= vol < 0.40:
+        return "C"
+
+    return "D"
+
+def build_profile_map():
+    import os
+    import json
+    import pandas as pd
+    import numpy as np
+
+    from scripts.config import DATA_DIR, GROUP_DIR
+    from scripts.data_management import load_data
+
+    with open(os.path.join(DATA_DIR, "ticker_map.json"), "r") as f:
+        ticker_map = json.load(f)
+        tickers = sorted(list(ticker_map.values()))
+
+    spy_df = pd.read_parquet(os.path.join(DATA_DIR, 'SPY_1d.parquet'))
+    spy_returns = spy_df["Adj Close"].pct_change().rename("benchmark_return")
+
+    profile_map = {"A": {}, "B": {}, "C": {}, "D": {}, "E": {}, "F": {}}
+    for ticker in tickers:
+        # try:
+        df = load_data(ticker, "1d")
+
+        if df is None or df.empty or len(df) < 300:
+            print(f"Skipping {ticker}: not enough data")
+            continue
+
+        returns = df["Adj Close"].pct_change().rename("stock_return")
+        aligned = pd.concat([returns, spy_returns], axis=1, sort=True).dropna().tail(500)
+
+        if len(aligned) < 300:
+            print(f"Skipping {ticker}: not enough aligned benchmark rows")
+            continue
+
+        vol = aligned["stock_return"].std() * np.sqrt(252)
+        beta = aligned["stock_return"].cov(aligned["benchmark_return"])
+        beta /= aligned["benchmark_return"].var() + 1e-12
+        adv = df["Volume"].tail(252).mean()
+
+        if not np.isfinite(vol) or not np.isfinite(beta) or not np.isfinite(adv):
+            print(f"Skipping {ticker}: non-finite profile values")
+            continue
+
+
+        profile_map[assign_profile(float(vol), float(beta), float(adv))][ticker] = {
+            "vol": float(vol),
+            "beta": float(beta),
+            "adv": float(adv),
+        }
+
+        # except Exception as e:
+        #     print(f"Skipping {ticker}: {e}")
+
+    for profile, tickers in profile_map.items():
+        with open(os.path.join(GROUP_DIR, f"Profile {profile}", "tickers.json"), "w") as f:
+            json.dump(tickers, f)
+
+
+########################################################################################################################
 
 if __name__ in "__main__":
     import time
     start = time.perf_counter()
 
-    from predictor import TrainingManager
-    print("Training...")
-    success = TrainingManager().run_training_pipeline("AAPL", "1d", force_train=True)
-    print(success)
+    # from predictor import TrainingManager
+    # print("Training...")
+    # success = TrainingManager().run_training_pipeline("AAPL", "1d", force_train=True)
+    # print(success)
     # print("Predicting...")
     # run_prediction_pipeline("AAPL", "1d")
 
-
+    from folder_trees import generate_tree
+    generate_tree("/home/god/Projects/market_predictor", ignore_paths=[".bin", ".venv", "cache_files", "imgs"])
 
 
     print(time.perf_counter() - start)
