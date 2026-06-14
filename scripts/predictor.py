@@ -21,6 +21,7 @@ from catboost import CatBoostRegressor
 from lightgbm import LGBMRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from sklearn.model_selection import ParameterSampler
+import optuna
 
 from scripts.config import DATA_DIR, MODEL_DIR
 from scripts.data_management import load_data
@@ -118,123 +119,146 @@ class TrainingManager:
         tune_train_df = self.train_df[self.train_df["Date"] <= split_date].copy()
         tune_val_df = self.train_df[self.train_df["Date"] > split_date].copy()
 
-        X_tune_train = tune_train_df[self.feature_cols].values
-        y_tune_train = tune_train_df["target_excess_return"].values.astype(np.float32)
+        X_tune_train = tune_train_df[self.feature_cols].to_numpy(dtype=np.float32)
+        y_tune_train = tune_train_df["target_excess_return"].to_numpy(dtype=np.float32)
 
-        X_tune_val = tune_val_df[self.feature_cols].values
-        y_tune_val = tune_val_df["target_excess_return"].values.astype(np.float32)
+        X_tune_val = tune_val_df[self.feature_cols].to_numpy(dtype=np.float32)
+        y_tune_val = tune_val_df["target_excess_return"].to_numpy(dtype=np.float32)
 
         return X_tune_train, y_tune_train, X_tune_val, y_tune_val, tune_val_df
 
-    def tune_lightgbm(self, n_trials: int = 20) -> dict:
+    def _portfolio_tuning_score(self, portfolio_metrics: dict[str, Any]) -> float:
+        if portfolio_metrics["portfolio_days"] <= 0:
+            return -np.inf
+
+        cagr = portfolio_metrics["portfolio_cagr_like"]
+        sharpe = portfolio_metrics["portfolio_sharpe_like"]
+        max_drawdown = abs(portfolio_metrics["portfolio_max_drawdown"])
+        turnover = portfolio_metrics["portfolio_avg_turnover"]
+
+        return cagr + 0.05 * sharpe - 0.50 * max_drawdown - 0.002 * turnover
+
+    def _keep_top_results(self, top_results: list[dict[str, Any]], result: dict[str, Any], top_k: int = 3) -> list[
+        dict[str, Any]]:
+        top_results.append(result)
+        top_results.sort(key=lambda r: r["score"], reverse=True)
+        return top_results[:top_k]
+
+    def tune_lightgbm(self, n_trials: int = 20) -> list:
         log(f"Tuning LightGBM with {n_trials} trials...")
 
         X_tune_train, y_tune_train, X_tune_val, y_tune_val, tune_val_df = self._make_tuning_split()
 
-        param_space = {
-            "n_estimators": [300, 500, 700, 1000],
-            "learning_rate": [0.01, 0.02, 0.025, 0.035, 0.05],
-            "max_depth": [3, 4, 5, 6, 8],
-            "num_leaves": [15, 31, 63, 127],
-            "min_child_samples": [30, 50, 80, 120, 200],
-            "subsample": [0.6, 0.75, 0.85, 1.0],
-            "colsample_bytree": [0.6, 0.75, 0.85, 1.0],
-            "reg_alpha": [0.0, 0.05, 0.1, 0.5, 1.0],
-            "reg_lambda": [0.5, 1.0, 2.0, 5.0, 10.0],
-        }
+        def objective(trial):
+            sampled_params = {
+                "n_estimators": trial.suggest_categorical("n_estimators", [300, 500, 700]),
+                "learning_rate": trial.suggest_float("learning_rate", 0.015, 0.05, log=True),
+                "max_depth": trial.suggest_categorical("max_depth", [4, 5, 6, 8]),
+                "num_leaves": trial.suggest_categorical("num_leaves", [31, 63, 127]),
+                "min_child_samples": trial.suggest_categorical("min_child_samples", [100, 150, 200, 300]),
+                "subsample": trial.suggest_categorical("subsample", [0.85, 1.0]),
+                "colsample_bytree": trial.suggest_categorical("colsample_bytree", [0.75, 0.85, 1.0]),
+                "reg_alpha": trial.suggest_categorical("reg_alpha", [0.1, 0.5, 1.0]),
+                "reg_lambda": trial.suggest_categorical("reg_lambda", [0.5, 1.0, 2.0]),
+            }
 
-        sampler = list(ParameterSampler(param_space, n_iter=n_trials, random_state=self.seed))
-
-        best_score = -np.inf
-        best_params = None
-        best_result = None
-
-        for i, sampled_params in enumerate(sampler, start=1):
             params = self._get_lgbm_params({"LGBM": {"best_params": sampled_params}})
             model = LGBMRegressor(random_state=self.seed, verbose=-1, **params)
 
-            try:
-                model.fit(X_tune_train, y_tune_train)
-                pred = model.predict(X_tune_val)
+            model.fit(X_tune_train, y_tune_train)
+            pred = model.predict(X_tune_val)
 
-                base_df = tune_val_df.copy()
-                base_df["pred"] = pred
+            base_df = tune_val_df.copy()
+            base_df["pred"] = pred
 
-                scored_df = self._apply_signals(
-                    base_df,
-                    pred=None,
-                    max_top_tickers=self.config.max_top_tickers,
-                    allow_short=self.config.allow_short,
-                )
+            scored_df = self._apply_signals(
+                base_df,
+                pred=None,
+                max_top_tickers=self.config.max_top_tickers,
+                allow_short=self.config.allow_short,
+            )
 
-                row_metrics = self.evaluate_strategy(scored_df)
-                portfolio_metrics = self.evaluate_rotating_portfolio(
-                    base_df,
-                    max_top_tickers=self.config.max_top_tickers,
-                    allow_short=self.config.allow_short,
-                )
+            row_metrics = self.evaluate_strategy(scored_df)
+            portfolio_metrics = self.evaluate_rotating_portfolio(
+                base_df,
+                max_top_tickers=self.config.max_top_tickers,
+                allow_short=self.config.allow_short,
+            )
 
-                score = portfolio_metrics["portfolio_sharpe_like"]
+            score = self._portfolio_tuning_score(portfolio_metrics)
 
-                result = {
-                    "trial": i,
-                    "score": float(score),
-                    "mae": float(mean_absolute_error(y_tune_val, pred)),
-                    "rmse": float(mean_squared_error(y_tune_val, pred) ** 0.5),
-                    "rank_ic_mean": row_metrics["rank_ic_mean"],
-                    "hit_rate": row_metrics["hit_rate"],
-                    "median_return": row_metrics["median_return"],
-                    "portfolio": portfolio_metrics,
-                    "params": sampled_params,
-                }
+            trial.set_user_attr("mae", float(mean_absolute_error(y_tune_val, pred)))
+            trial.set_user_attr("rmse", float(mean_squared_error(y_tune_val, pred) ** 0.5))
+            trial.set_user_attr("rank_ic_mean", row_metrics["rank_ic_mean"])
+            trial.set_user_attr("hit_rate", row_metrics["hit_rate"])
+            trial.set_user_attr("median_return", row_metrics["median_return"])
+            trial.set_user_attr("portfolio", portfolio_metrics)
 
-                log(json.dumps(result, indent=4))
+            log(json.dumps({
+                "trial": trial.number,
+                "score": float(score),
+                "params": sampled_params,
+                "portfolio": portfolio_metrics,
+            }, indent=4))
 
-                if score > best_score:
-                    best_score = score
-                    best_params = sampled_params
-                    best_result = result
+            return score
 
-            except Exception as e:
-                log(f"LGBM tuning trial {i} failed: {e}")
+        study = optuna.create_study(
+            study_name="lgbm_optuna",
+            direction="maximize",
+            storage=f"sqlite:///lgbm_optuna.db",
+            load_if_exists=True,
+        )
 
-            flush_memory()
+        study.optimize(objective, n_trials=n_trials)
 
-        if best_params is None:
-            log("LightGBM tuning failed. Falling back to default params.")
-            return {}
+        complete_trials = [t for t in study.trials if t.value is not None]
+        top_trials = sorted(complete_trials, key=lambda t: t.value, reverse=True)[:3]
 
-        log("Best LightGBM tuning result:")
-        log(json.dumps(best_result, indent=4))
+        top_results = []
+        for t in top_trials:
+            top_results.append({
+                "trial": t.number,
+                "score": float(t.value),
+                "params": t.params,
+                "mae": t.user_attrs.get("mae"),
+                "rmse": t.user_attrs.get("rmse"),
+                "rank_ic_mean": t.user_attrs.get("rank_ic_mean"),
+                "hit_rate": t.user_attrs.get("hit_rate"),
+                "median_return": t.user_attrs.get("median_return"),
+                "portfolio": t.user_attrs.get("portfolio"),
+            })
 
-        return best_params
+        log("Top 3 LightGBM Optuna results:")
+        log(json.dumps(top_results, indent=4))
 
-    def tune_catboost(self, n_trials: int = 10) -> dict:
-        log(f"Tuning CatBoost with {n_trials} trials...")
+        return top_results
+
+    def tune_catboost_optuna(self, n_trials: int = 75, study_name: str = "catboost_tuning") -> list[dict[str, Any]]:
+        import optuna
+
+        log(f"Tuning CatBoost with Optuna for {n_trials} trials...")
 
         X_tune_train, y_tune_train, X_tune_val, y_tune_val, tune_val_df = self._make_tuning_split()
 
-        param_space = {
-            "iterations": [300, 500, 700],
-            "learning_rate": [0.01, 0.02, 0.025, 0.035, 0.05],
-            "depth": [4, 5, 6, 7],
-            "l2_leaf_reg": [1.0, 3.0, 5.0, 10.0],
-            "random_strength": [0.0, 0.5, 1.0, 2.0],
-            "bagging_temperature": [0.0, 0.5, 1.0, 2.0],
-            "border_count": [64, 128, 254],
-        }
+        def objective(trial):
+            sampled_params = {
+                "iterations": trial.suggest_categorical("iterations", [500, 700, 1000]),
+                "learning_rate": trial.suggest_float("learning_rate", 0.02, 0.06, log=True),
+                "depth": trial.suggest_categorical("depth", [4, 5, 6]),
+                "l2_leaf_reg": trial.suggest_categorical("l2_leaf_reg", [3.0, 5.0, 10.0]),
+                "random_strength": trial.suggest_categorical("random_strength", [0.5, 1.0, 2.0]),
+                "bagging_temperature": trial.suggest_categorical("bagging_temperature", [1.0, 2.0, 3.0]),
+                "border_count": trial.suggest_categorical("border_count", [64, 128, 254]),
+            }
 
-        sampler = list(ParameterSampler(param_space, n_iter=n_trials, random_state=self.seed))
-
-        best_score = -np.inf
-        best_params = None
-        best_result = None
-
-        for i, sampled_params in enumerate(sampler, start=1):
             params = self._get_cat_params({"CAT": {"best_params": sampled_params}})
             model = CatBoostRegressor(random_seed=self.seed, verbose=False, **params)
 
             try:
+                log(f"Starting CatBoost Optuna trial {trial.number}: {sampled_params}")
+                print(f"Starting CatBoost Optuna trial {trial.number}", flush=True)
+
                 model.fit(X_tune_train, y_tune_train)
                 pred = model.predict(X_tune_val)
 
@@ -255,13 +279,20 @@ class TrainingManager:
                     allow_short=self.config.allow_short,
                 )
 
-                score = portfolio_metrics["portfolio_sharpe_like"]
+                score = self._portfolio_tuning_score(portfolio_metrics)
+
+                trial.set_user_attr("mae", float(mean_absolute_error(y_tune_val, pred)))
+                trial.set_user_attr("rmse", float(mean_squared_error(y_tune_val, pred) ** 0.5))
+                trial.set_user_attr("rank_ic_mean", row_metrics["rank_ic_mean"])
+                trial.set_user_attr("hit_rate", row_metrics["hit_rate"])
+                trial.set_user_attr("median_return", row_metrics["median_return"])
+                trial.set_user_attr("portfolio", portfolio_metrics)
 
                 result = {
-                    "trial": i,
+                    "trial": trial.number,
                     "score": float(score),
-                    "mae": float(mean_absolute_error(y_tune_val, pred)),
-                    "rmse": float(mean_squared_error(y_tune_val, pred) ** 0.5),
+                    "mae": trial.user_attrs["mae"],
+                    "rmse": trial.user_attrs["rmse"],
                     "rank_ic_mean": row_metrics["rank_ic_mean"],
                     "hit_rate": row_metrics["hit_rate"],
                     "median_return": row_metrics["median_return"],
@@ -271,25 +302,54 @@ class TrainingManager:
 
                 log(json.dumps(result, indent=4))
 
-                if score > best_score:
-                    best_score = score
-                    best_params = sampled_params
-                    best_result = result
+                return score
 
             except Exception as e:
-                log(f"CatBoost tuning trial {i} failed: {e}")
+                log(f"CatBoost Optuna trial {trial.number} failed: {e}")
+                return -np.inf
 
-            del model
-            flush_memory()
+            finally:
+                del model
+                flush_memory()
 
-        if best_params is None:
-            log("CatBoost tuning failed. Falling back to default params.")
-            return {}
+        study = optuna.create_study(
+            study_name=study_name,
+            direction="maximize",
+            storage=f"sqlite:///{study_name}.db",
+            load_if_exists=True,
+        )
 
-        log("Best CatBoost tuning result:")
-        log(json.dumps(best_result, indent=4))
+        study.optimize(objective, n_trials=n_trials, gc_after_trial=True)
 
-        return best_params
+        complete_trials = [
+            t for t in study.trials
+            if t.state == optuna.trial.TrialState.COMPLETE and t.value is not None and np.isfinite(t.value)
+        ]
+
+        top_trials = sorted(complete_trials, key=lambda t: t.value, reverse=True)[:3]
+
+        top_results = []
+        for t in top_trials:
+            top_results.append({
+                "trial": t.number,
+                "score": float(t.value),
+                "params": t.params,
+                "mae": t.user_attrs.get("mae"),
+                "rmse": t.user_attrs.get("rmse"),
+                "rank_ic_mean": t.user_attrs.get("rank_ic_mean"),
+                "hit_rate": t.user_attrs.get("hit_rate"),
+                "median_return": t.user_attrs.get("median_return"),
+                "portfolio": t.user_attrs.get("portfolio"),
+            })
+
+        if not top_results:
+            log("CatBoost Optuna tuning failed. No successful trials.")
+            return []
+
+        log("Top 3 CatBoost Optuna results:")
+        log(json.dumps(top_results, indent=4))
+
+        return top_results
 
     def run_tuning_pipeline(self, interval, force_train: bool = True) -> bool:
         if interval == "1d":
@@ -307,13 +367,21 @@ class TrainingManager:
         log("DEBUG: finished _prepare_data")
         print("DEBUG: finished _prepare_data", flush=True)
 
-        best_lgbm_params = self.tune_lightgbm(n_trials=5)
-        with open(f"lgbm_params_{interval}.json", "w") as f:
-            json.dump(best_lgbm_params, f)
+        top_lgbm_results = self.tune_lightgbm(n_trials=30)
+        with open(f"lgbm_top_results_{interval}.json", "w") as f:
+            json.dump(top_lgbm_results, f, indent=4)
 
-        best_cat_params = self.tune_catboost(n_trials=5)
+        best_lgbm_params = top_lgbm_results[0]["params"] if top_lgbm_results else {}
+        with open(f"lgbm_params_{interval}.json", "w") as f:
+            json.dump(best_lgbm_params, f, indent=4)
+
+        top_cat_results = self.tune_catboost(n_trials=30)
+        with open(f"cat_top_results_{interval}.json", "w") as f:
+            json.dump(top_cat_results, f, indent=4)
+
+        best_cat_params = top_cat_results[0]["params"] if top_cat_results else {}
         with open(f"cat_params_{interval}.json", "w") as f:
-            json.dump(best_cat_params, f)
+            json.dump(best_cat_params, f, indent=4)
 
         return True
 
@@ -422,11 +490,11 @@ class TrainingManager:
         self.train_df = data[data["Date"] <= self.split_date].copy()
         self.test_df = data[data["Date"] > self.split_date].copy()
 
-        self.X_train = self.train_df[self.feature_cols].values
-        self.X_test = self.test_df[self.feature_cols].values
+        self.X_train = self.train_df[self.feature_cols].to_numpy(dtype=np.float32)
+        self.X_test = self.test_df[self.feature_cols].to_numpy(dtype=np.float32)
 
-        self.y_train = self.train_df["target_excess_return"].values.astype(np.float32)
-        self.y_test = self.test_df["target_excess_return"].values.astype(np.float32)
+        self.y_train = self.train_df["target_excess_return"].to_numpy(dtype=np.float32)
+        self.y_test = self.test_df["target_excess_return"].to_numpy(dtype=np.float32)
 
         log(f"Features: {len(self.feature_cols)}")
         log(f"Train rows: {len(self.train_df):,}")
