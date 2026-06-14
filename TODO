@@ -1,5 +1,13 @@
 
 
+daily:
+h=40
+tt=30
+
+hourly:
+h=30
+tt=10
+
 
 cd ~/Market-Predictor
 

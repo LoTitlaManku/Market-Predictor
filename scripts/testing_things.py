@@ -639,8 +639,8 @@ if __name__ in "__main__":
     # print("Predicting...")
     # run_prediction_pipeline("AAPL", "1d")
 
-    from folder_trees import generate_tree
-    generate_tree("/home/god/Projects/market_predictor", ignore_paths=[".bin", ".venv", "cache_files", "imgs"])
+    # from folder_trees import generate_tree
+    # generate_tree("/home/god/Projects/market_predictor", ignore_paths=[".bin", ".venv", "cache_files", "imgs"])
 
 
     print(time.perf_counter() - start)

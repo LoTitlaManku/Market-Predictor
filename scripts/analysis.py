@@ -580,16 +580,16 @@ if __name__ == '__main__':
     # with time_machine.travel(target_time):
         # function()
 
-    # updates(  # Whether to update:
-    #     sent=True,  # News sentiment
-    #     spy=True,  # Market sentiment indicators
-    #     cache=True,  # Stock cache
-    # )
-
-    run_training(
-        free_cores=4 # How many CPU cores do you want left free
-                     # Not necessary as there are stop buttons
+    updates(  # Whether to update:
+        sent=True,  # News sentiment
+        spy=True,  # Market sentiment indicators
+        cache=True,  # Stock cache
     )
+
+    # run_training(
+    #     free_cores=4 # How many CPU cores do you want left free
+    #                  # Not necessary as there are stop buttons
+    # )
 
     # run_predictions(
     #     free_cores=1 # How many CPU cores do you want left free

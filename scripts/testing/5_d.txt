@@ -1,0 +1,258 @@
+Building universe dataframe...Preparing pooled features...Features: 65Train rows: 3,213,696Test rows: 1,227,030Split date: 2019-09-03Baselines:{
+    "random": {
+        "trade_rate": 0.02486165782417708,
+        "long_rate": 0.02486165782417708,
+        "short_rate": 0.0,
+        "hit_rate": 0.4879695797548023,
+        "mean_return": 0.0006038109440917223,
+        "median_return": -0.001026469538841216,
+        "sharpe_like": 0.0717337019877352,
+        "rank_ic_mean": 0.0005379398862737733,
+        "rank_ic_ir": 0.014617839307778352,
+        "n_trades": 30506,
+        "long_stats": {
+            "hit_rate": 0.4879695797548023,
+            "mean_return": 0.0006038109440917223,
+            "median_return": -0.001026469538841216,
+            "n": 30506
+        },
+        "short_stats": {
+            "hit_rate": 0.0,
+            "mean_return": 0.0,
+            "median_return": 0.0,
+            "n": 0
+        }
+    },
+    "momentum_1m": {
+        "trade_rate": 0.024851878112189595,
+        "long_rate": 0.024851878112189595,
+        "short_rate": 0.0,
+        "hit_rate": 0.47061717059093594,
+        "mean_return": 0.0013157081624204463,
+        "median_return": -0.002622710041503869,
+        "sharpe_like": 0.08431863362987292,
+        "rank_ic_mean": -0.010908185070729626,
+        "rank_ic_ir": -0.0671652798898604,
+        "n_trades": 30494,
+        "long_stats": {
+            "hit_rate": 0.47061717059093594,
+            "mean_return": 0.0013157081624204463,
+            "median_return": -0.002622710041503869,
+            "n": 30494
+        },
+        "short_stats": {
+            "hit_rate": 0.0,
+            "mean_return": 0.0,
+            "median_return": 0.0,
+            "n": 0
+        }
+    },
+    "reversal_1m": {
+        "trade_rate": 0.024860842848178123,
+        "long_rate": 0.024860842848178123,
+        "short_rate": 0.0,
+        "hit_rate": 0.49808228159318146,
+        "mean_return": 0.00405262399018674,
+        "median_return": -0.0002359988756932196,
+        "sharpe_like": 0.31074532363836466,
+        "rank_ic_mean": 0.010908185070729626,
+        "rank_ic_ir": 0.0671652798898604,
+        "n_trades": 30505,
+        "long_stats": {
+            "hit_rate": 0.49808228159318146,
+            "mean_return": 0.00405262399018674,
+            "median_return": -0.0002359988756932196,
+            "n": 30505
+        },
+        "short_stats": {
+            "hit_rate": 0.0,
+            "mean_return": 0.0,
+            "median_return": 0.0,
+            "n": 0
+        }
+    }
+}Training LightGBM...{
+    "type": "LGBM",
+    "mae": 0.039275401675883725,
+    "rmse": 0.54635945319896,
+    "trade_rate": 0.020453452645819582,
+    "long_rate": 0.020453452645819582,
+    "short_rate": 0.0,
+    "hit_rate": 0.5026098736900825,
+    "mean_return": 0.028419451599946636,
+    "median_return": 0.000319685700239704,
+    "sharpe_like": 0.09004561121396427,
+    "rank_ic_mean": 0.03046864484430947,
+    "rank_ic_ir": 0.19657452841628237,
+    "n_trades": 25097,
+    "long_stats": {
+        "hit_rate": 0.5026098736900825,
+        "mean_return": 0.028419451599946636,
+        "median_return": 0.000319685700239704,
+        "n": 25097
+    },
+    "short_stats": {
+        "hit_rate": 0.0,
+        "mean_return": 0.0,
+        "median_return": 0.0,
+        "n": 0
+    },
+    "portfolio": {
+        "portfolio_days": 1673,
+        "portfolio_total_return": 38.256296201437664,
+        "portfolio_cagr_like": 0.7381480269892771,
+        "portfolio_sharpe_like": 1.483687867104066,
+        "portfolio_max_drawdown": -0.6880047594984445,
+        "portfolio_win_rate": 0.5265989240884639,
+        "portfolio_mean_daily_return": 0.002578931681363787,
+        "portfolio_median_daily_return": 0.0013494045566001768,
+        "portfolio_avg_holdings": 19.609085475194263,
+        "portfolio_avg_turnover": 10.135086670651525
+    },
+    "top_n_variants": {
+        "top_5": {
+            "trade_rate": 0.006313619063918568,
+            "long_rate": 0.006313619063918568,
+            "short_rate": 0.0,
+            "hit_rate": 0.5003227055634439,
+            "mean_return": 0.07349522762848552,
+            "median_return": 3.845558539766368e-05,
+            "sharpe_like": 0.1295082481677271,
+            "rank_ic_mean": 0.03046864484430947,
+            "rank_ic_ir": 0.19657452841628237,
+            "n_trades": 7747,
+            "long_stats": {
+                "hit_rate": 0.5003227055634439,
+                "mean_return": 0.07349522762848552,
+                "median_return": 3.845558539766368e-05,
+                "n": 7747
+            },
+            "short_stats": {
+                "hit_rate": 0.0,
+                "mean_return": 0.0,
+                "median_return": 0.0,
+                "n": 0
+            },
+            "portfolio": {
+                "portfolio_days": 1673,
+                "portfolio_total_return": 196.04184534599707,
+                "portfolio_cagr_like": 1.216276131954967,
+                "portfolio_sharpe_like": 1.4977746519967965,
+                "portfolio_max_drawdown": -0.8017704917464546,
+                "portfolio_win_rate": 0.5194261805140467,
+                "portfolio_mean_daily_return": 0.004100077256400879,
+                "portfolio_median_daily_return": 0.0013545905716569671,
+                "portfolio_avg_holdings": 4.97489539748954,
+                "portfolio_avg_turnover": 3.1040047818290497
+            }
+        },
+        "top_10": {
+            "trade_rate": 0.01215047716844739,
+            "long_rate": 0.01215047716844739,
+            "short_rate": 0.0,
+            "hit_rate": 0.5023811120799517,
+            "mean_return": 0.04287704866539495,
+            "median_return": 0.00033214572874460443,
+            "sharpe_like": 0.10476461941542198,
+            "rank_ic_mean": 0.03046864484430947,
+            "rank_ic_ir": 0.19657452841628237,
+            "n_trades": 14909,
+            "long_stats": {
+                "hit_rate": 0.5023811120799517,
+                "mean_return": 0.04287704866539495,
+                "median_return": 0.00033214572874460443,
+                "n": 14909
+            },
+            "short_stats": {
+                "hit_rate": 0.0,
+                "mean_return": 0.0,
+                "median_return": 0.0,
+                "n": 0
+            },
+            "portfolio": {
+                "portfolio_days": 1673,
+                "portfolio_total_return": 66.5839243723745,
+                "portfolio_cagr_like": 0.886361605008618,
+                "portfolio_sharpe_like": 1.4506656633535453,
+                "portfolio_max_drawdown": -0.7757139694895083,
+                "portfolio_win_rate": 0.5265989240884639,
+                "portfolio_mean_daily_return": 0.0031033442764231197,
+                "portfolio_median_daily_return": 0.001680409762342628,
+                "portfolio_avg_holdings": 9.915122534369397,
+                "portfolio_avg_turnover": 5.643753735803945
+            }
+        },
+        "top_20": {
+            "trade_rate": 0.020453452645819582,
+            "long_rate": 0.020453452645819582,
+            "short_rate": 0.0,
+            "hit_rate": 0.5026098736900825,
+            "mean_return": 0.028419451599946636,
+            "median_return": 0.000319685700239704,
+            "sharpe_like": 0.09004561121396427,
+            "rank_ic_mean": 0.03046864484430947,
+            "rank_ic_ir": 0.19657452841628237,
+            "n_trades": 25097,
+            "long_stats": {
+                "hit_rate": 0.5026098736900825,
+                "mean_return": 0.028419451599946636,
+                "median_return": 0.000319685700239704,
+                "n": 25097
+            },
+            "short_stats": {
+                "hit_rate": 0.0,
+                "mean_return": 0.0,
+                "median_return": 0.0,
+                "n": 0
+            },
+            "portfolio": {
+                "portfolio_days": 1673,
+                "portfolio_total_return": 38.256296201437664,
+                "portfolio_cagr_like": 0.7381480269892771,
+                "portfolio_sharpe_like": 1.483687867104066,
+                "portfolio_max_drawdown": -0.6880047594984445,
+                "portfolio_win_rate": 0.5265989240884639,
+                "portfolio_mean_daily_return": 0.002578931681363787,
+                "portfolio_median_daily_return": 0.0013494045566001768,
+                "portfolio_avg_holdings": 19.609085475194263,
+                "portfolio_avg_turnover": 10.135086670651525
+            }
+        },
+        "top_30": {
+            "trade_rate": 0.020453452645819582,
+            "long_rate": 0.020453452645819582,
+            "short_rate": 0.0,
+            "hit_rate": 0.5026098736900825,
+            "mean_return": 0.028419451599946636,
+            "median_return": 0.000319685700239704,
+            "sharpe_like": 0.09004561121396427,
+            "rank_ic_mean": 0.03046864484430947,
+            "rank_ic_ir": 0.19657452841628237,
+            "n_trades": 25097,
+            "long_stats": {
+                "hit_rate": 0.5026098736900825,
+                "mean_return": 0.028419451599946636,
+                "median_return": 0.000319685700239704,
+                "n": 25097
+            },
+            "short_stats": {
+                "hit_rate": 0.0,
+                "mean_return": 0.0,
+                "median_return": 0.0,
+                "n": 0
+            },
+            "portfolio": {
+                "portfolio_days": 1673,
+                "portfolio_total_return": 19.998452228087274,
+                "portfolio_cagr_like": 0.5818231142466606,
+                "portfolio_sharpe_like": 1.3959212616655625,
+                "portfolio_max_drawdown": -0.6372934275538417,
+                "portfolio_win_rate": 0.5349671249252839,
+                "portfolio_mean_daily_return": 0.0021118652551624724,
+                "portfolio_median_daily_return": 0.0015568498237996556,
+                "portfolio_avg_holdings": 27.18350268977884,
+                "portfolio_avg_turnover": 13.060370591751346
+            }
+        }
+    }
+}Training CatBoost...Building universe dataframe...

@@ -1,4 +1,5 @@
 import os
+import time
 
 import pandas as pd
 import numpy as np
@@ -129,30 +130,30 @@ class TechnicalAnalysisAccessor:
         df['upper_shadow_pct'] = (df['Adj High'] - df[['Adj Open', 'Adj Close']].max(axis=1)) / df['Adj Close']
         df['lower_shadow_pct'] = (df[['Adj Open', 'Adj Close']].min(axis=1) - df['Adj Low']) / df['Adj Close']
 
-        # Hurst Exponent
-        def calculate_hurst(series, window=100):
-            if len(series) < window: return 0.5
-            lags = range(2, 20)
-            tau = [np.sqrt(np.std(np.subtract(series[lag:], series[:-lag]))) + 1e-9 for lag in lags]
-            poly = np.polyfit(np.log(lags), np.log(tau), 1)
-            return poly[0] * 2.0
-
-        df['Hurst_Exponent'] = df['Adj Close'].rolling(window=100, min_periods=100).apply(calculate_hurst, raw=True)
-        df['Hurst_Exponent'] = df['Hurst_Exponent'].fillna(0.5)
-
-        # Kalman Filter
-        def get_kalman_filter(series):
-            kf = KalmanFilter(transition_matrices=[1],
-                              observation_matrices=[1],
-                              initial_state_mean=series.iloc[0],
-                              initial_state_covariance=1,
-                              observation_covariance=1,
-                              transition_covariance=0.01)
-            state_means, _ = kf.filter(series.values)
-            return state_means.flatten()
-
-        df['Kalman_Price'] = get_kalman_filter(df['Adj Close'])
-        df['Kalman_Dev'] = (df['Adj Close'] - df['Kalman_Price']) / df['Kalman_Price']  # Deviation from "True" price
+        # # Hurst Exponent
+        # def calculate_hurst(series, window=100):
+        #     if len(series) < window: return 0.5
+        #     lags = range(2, 20)
+        #     tau = [np.sqrt(np.std(np.subtract(series[lag:], series[:-lag]))) + 1e-9 for lag in lags]
+        #     poly = np.polyfit(np.log(lags), np.log(tau), 1)
+        #     return poly[0] * 2.0
+        #
+        # df['Hurst_Exponent'] = df['Adj Close'].rolling(window=100, min_periods=100).apply(calculate_hurst, raw=True)
+        # df['Hurst_Exponent'] = df['Hurst_Exponent'].fillna(0.5)
+        #
+        # # Kalman Filter
+        # def get_kalman_filter(series):
+        #     kf = KalmanFilter(transition_matrices=[1],
+        #                       observation_matrices=[1],
+        #                       initial_state_mean=series.iloc[0],
+        #                       initial_state_covariance=1,
+        #                       observation_covariance=1,
+        #                       transition_covariance=0.01)
+        #     state_means, _ = kf.filter(series.values)
+        #     return state_means.flatten()
+        #
+        # df['Kalman_Price'] = get_kalman_filter(df['Adj Close'])
+        # df['Kalman_Dev'] = (df['Adj Close'] - df['Kalman_Price']) / df['Kalman_Price']  # Deviation from "True" price
 
         # Garman-Klass Volatility
         df['GK_vol'] = np.sqrt(

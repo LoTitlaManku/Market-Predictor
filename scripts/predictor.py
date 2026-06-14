@@ -11,6 +11,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+from tqdm import tqdm
 
 import joblib
 import numpy as np
@@ -19,9 +20,8 @@ import torch
 from catboost import CatBoostRegressor
 from lightgbm import LGBMRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error
-from torch.nn import GRU
 
-from scripts.config import DATA_DIR, GROUP_DIR, MODEL_DIR
+from scripts.config import DATA_DIR, MODEL_DIR
 from scripts.data_management import load_data
 import scripts.indicators  # noqa: F401
 
@@ -38,17 +38,26 @@ class Settings:
 
 @dataclass
 class UniverseConfig:
-    horizon: int = 20
-    top_q: float = 0.90
-    bottom_q: float = 0.10
+    horizon: int = 30
+    max_top_tickers: int = 10
+
+    edge_q: float = 0.02
     min_abs_pred: float = 0.003
-    allow_short: bool = True
+    allow_short: bool = False
     cost_bps: float = 10.0
+
+    replace_buffer: float = 0.002
+    exit_pred_threshold: float = 0.0
 
 def flush_memory():
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
+
+def log(string: str):
+    global hor
+    with open(f"testing/{hor}.txt", "a") as f:
+        f.write(f"{string}\n")
 
 ########################################################################################################################
 
@@ -102,55 +111,62 @@ class TrainingManager:
         self.y_test = None
 
     @staticmethod
-    def add_forward_excess_target(df: pd.DataFrame, benchmark_close: pd.Series, horizon: int) -> pd.DataFrame:
+    def add_forward_excess_target(df: pd.DataFrame, benchmark_close: pd.Series, horizon: int, beta: float = 1.0) -> pd.DataFrame:
         df = df.copy()
 
         close = df["Adj Close"]
         benchmark_close = benchmark_close.reindex(df.index).ffill()
 
+        beta = 1.0 if not np.isfinite(beta) else float(beta)
+
         df["future_return"] = close.shift(-horizon) / close - 1.0
         df["benchmark_future_return"] = benchmark_close.shift(-horizon) / benchmark_close - 1.0
-        df["target_excess_return"] = df["future_return"] - df["benchmark_future_return"]
+        df["target_excess_return"] = df["future_return"] - beta * df["benchmark_future_return"]
 
         return df.dropna(subset=["target_excess_return"])
 
-    def _build_universe_frame(self, interval: str, group: str) -> pd.DataFrame:
-        with open(os.path.join(GROUP_DIR, f"Profile {group}", "tickers.json"), "r") as f:
-            self.ticker_map = json.load(f)
+    def _build_universe_frame(self, interval: str) -> pd.DataFrame:
+        with open(os.path.join(DATA_DIR, "ticker_attr.json"), "r") as f:
+            ticker_map = json.load(f)
 
-        benchmark_raw = pd.read_parquet(os.path.join(GROUP_DIR, f"Profile {group}", f"benchmark_{interval}.parquet"))
+        ticker_list = sorted(set(ticker_map.keys()))#[:50]
+        # self.config.edge_q = min(self.config.edge_q * len(ticker_list), self.config.max_top_tickers) / len(ticker_list)
+
+        benchmark_raw = pd.read_parquet(os.path.join(DATA_DIR, f"SPY_{interval}.parquet"))
         benchmark_raw.index.name = "Date"
         benchmark_raw.index = pd.to_datetime(benchmark_raw.index, utc=True).tz_localize(None)
         benchmark_raw = benchmark_raw[~benchmark_raw.index.duplicated(keep="first")].sort_index()
         benchmark_close = benchmark_raw["Adj Close"]
 
         frames = []
-        for ticker, meta in self.ticker_map.items():
+        for ticker in tqdm(ticker_list):
             try:
                 raw = load_data(ticker, interval)
                 if raw is None or raw.empty:
-                    print(f"Skipping {ticker}: no data")
+                    log(f"Skipping {ticker}: no data")
                     continue
 
+                beta = ticker_map.get(ticker, {}).get("beta", np.nan)
                 df = raw.ind.add_indicators(ticker, interval, add_targets=False)
-                df = self.add_forward_excess_target(df, benchmark_close, self.config.horizon)
+                df = self.add_forward_excess_target(df, benchmark_close, self.config.horizon, beta)
 
                 df["ticker"] = ticker
-                df["profile"] = f"Profile {group}"
-                df["profile_vol"] = meta["vol"]
-                df["profile_beta"] = meta["beta"]
-                df["profile_adv_log"] = np.log1p(meta["adv"]) if np.isfinite(meta["adv"]) else np.nan
+                df["profile"] = "All"
+                df["profile_vol"] = ticker_map.get(ticker, {}).get("vol", np.nan)
+                df["profile_beta"] = beta
+                df["profile_adv_log"] = np.log1p(ticker_map.get(ticker, {}).get("adv", np.nan))
                 df["Date"] = df.index
 
+                df = df.reset_index(drop=True)
                 frames.append(df)
 
             except Exception as e:
-                print(f"Skipping {ticker}: {e}")
+                log(f"Skipping {ticker}: {e}")
 
         if not frames:
             raise ValueError("No usable universe data")
 
-        data = pd.concat(frames, axis=0)
+        data = pd.concat(frames, axis=0, ignore_index=True)
         data = data.sort_values(["Date", "ticker"])
         data = data.replace([np.inf, -np.inf], np.nan)
         data = data.dropna()
@@ -160,7 +176,20 @@ class TrainingManager:
     def _prepare_data(self, data: pd.DataFrame) -> None:
         data = data.copy()
         data["profile_group"] = data["profile"]
-        data = pd.get_dummies(data, columns=["profile"], prefix="profile", dtype=int)
+
+        ticker_risk = data[["ticker", "profile_vol"]].drop_duplicates("ticker").dropna(subset=["profile_vol"]).copy()
+
+        ticker_risk["risk_bucket"] = pd.qcut(
+            ticker_risk["profile_vol"].rank(method="first"),
+            q=5,
+            labels=["vol_1", "vol_2", "vol_3", "vol_4", "vol_5"]
+        )
+
+        data = data.merge(ticker_risk[["ticker", "risk_bucket"]], on="ticker", how="left")
+        data["risk_bucket"] = data["risk_bucket"].astype(str).fillna("unknown")
+        data["profile_group"] = data["risk_bucket"]
+
+        data = pd.get_dummies(data, columns=["profile", "risk_bucket"], prefix=["profile", "risk_bucket"], dtype=int)
 
         drop_cols = {
             "Open", "High", "Low", "Close", "Adj Close", "Volume",
@@ -189,41 +218,57 @@ class TrainingManager:
         self.y_train = self.train_df["target_excess_return"].values.astype(np.float32)
         self.y_test = self.test_df["target_excess_return"].values.astype(np.float32)
 
-        print(f"Features: {len(self.feature_cols)}")
-        print(f"Train rows: {len(self.train_df):,}")
-        print(f"Test rows: {len(self.test_df):,}")
-        print(f"Split date: {pd.Timestamp(self.split_date).strftime('%Y-%m-%d')}")
+        log(f"Features: {len(self.feature_cols)}")
+        log(f"Train rows: {len(self.train_df):,}")
+        log(f"Test rows: {len(self.test_df):,}")
+        log(f"Split date: {pd.Timestamp(self.split_date).strftime('%Y-%m-%d')}")
 
-    def add_cross_sectional_signals(self, df: pd.DataFrame, pred_col: str, group_cols: list) -> pd.DataFrame:
+    def _effective_edge_q(self, df: pd.DataFrame, max_top_tickers: int | None = None) -> float:
+        max_top_tickers = max_top_tickers or self.config.max_top_tickers
+        n_tickers = max(1, df["ticker"].nunique())
+        return min(self.config.edge_q, max_top_tickers / n_tickers)
+
+    def add_cross_sectional_signals(self, df: pd.DataFrame, pred_col: str, group_cols: list | None = None, max_top_tickers: int | None = None,  allow_short: bool | None = None) -> pd.DataFrame:
         df = df.copy()
         df["pred_signal"] = 0
 
         if group_cols is None:
             group_cols = ["Date", "profile_group"]
 
+        allow_short = self.config.allow_short if allow_short is None else allow_short
+        edge_q = self._effective_edge_q(df, max_top_tickers)
+
         for _, group in df.groupby(group_cols):
             if len(group) < 5:
                 continue
 
-            upper = group[pred_col].quantile(self.config.top_q)
-            lower = group[pred_col].quantile(self.config.bottom_q)
+            upper = group[pred_col].quantile(1 - edge_q)
+            lower = group[pred_col].quantile(edge_q)
 
             long_mask = (group[pred_col] >= upper) & (group[pred_col].abs() >= self.config.min_abs_pred)
             df.loc[group.index[long_mask], "pred_signal"] = 1
 
-            if self.config.allow_short:
+            if allow_short:
                 short_mask = (group[pred_col] <= lower) & (group[pred_col].abs() >= self.config.min_abs_pred)
                 df.loc[group.index[short_mask], "pred_signal"] = -1
 
         return df
 
-    def _apply_signals(self, test_df: pd.DataFrame, pred: np.ndarray) -> pd.DataFrame:
+    def _apply_signals(self, test_df: pd.DataFrame, pred: np.ndarray | None = None, max_top_tickers: int | None = None, allow_short: bool | None = None) -> pd.DataFrame:
         out = test_df.copy()
-        out["pred"] = pred
 
-        out = self.add_cross_sectional_signals(out, "pred", ["Date", "profile_group"])
+        if pred is not None:
+            out["pred"] = pred
 
-        return out
+        return self.add_cross_sectional_signals(
+            out,
+            "pred",
+            ["Date", "profile_group"],
+            max_top_tickers=max_top_tickers,
+            allow_short=allow_short,
+        )
+
+
 
     def evaluate_strategy(self, df: pd.DataFrame) -> dict[str, Any]:
         trades = df[df["pred_signal"] != 0].copy()
@@ -261,6 +306,20 @@ class TrainingManager:
         rank_ic_mean = float(np.mean(daily_ics)) if daily_ics else 0.0
         rank_ic_std = float(np.std(daily_ics)) + 1e-9 if daily_ics else 1.0
 
+        long_trades = trades[trades["pred_signal"] == 1]
+        short_trades = trades[trades["pred_signal"] == -1]
+
+        def side_stats(side_df):
+            if side_df.empty:
+                return {"hit_rate": 0.0, "mean_return": 0.0, "median_return": 0.0, "n": 0}
+
+            return {
+                "hit_rate": float((side_df["strategy_return"] > 0).mean()),
+                "mean_return": float(side_df["strategy_return"].mean()),
+                "median_return": float(side_df["strategy_return"].median()),
+                "n": int(len(side_df)),
+            }
+
         return {
             "trade_rate": float((df["pred_signal"] != 0).mean()),
             "long_rate": float((df["pred_signal"] == 1).mean()),
@@ -272,6 +331,8 @@ class TrainingManager:
             "rank_ic_mean": rank_ic_mean,
             "rank_ic_ir": float(rank_ic_mean / rank_ic_std),
             "n_trades": int(len(trades)),
+            "long_stats": side_stats(long_trades),
+            "short_stats": side_stats(short_trades),
         }
 
     def evaluate_baselines(self) -> dict[str, dict[str, Any]]:
@@ -294,6 +355,210 @@ class TrainingManager:
         results["reversal_1m"] = self.evaluate_strategy(reversal_df)
 
         return results
+
+
+    def _daily_candidate_pool(self, day: pd.DataFrame, max_top_tickers: int, allow_short: bool) -> pd.DataFrame:
+        signalled = self.add_cross_sectional_signals(
+            day,
+            "pred",
+            ["Date", "profile_group"],
+            max_top_tickers=max_top_tickers,
+            allow_short=allow_short,
+        )
+
+        candidates = signalled[signalled["pred_signal"] != 0].copy()
+        if candidates.empty:
+            return candidates
+
+        candidates["score"] = np.where(
+            candidates["pred_signal"] == 1,
+            candidates["pred"],
+            -candidates["pred"],
+        )
+
+        return candidates.sort_values("score", ascending=False)
+
+    def evaluate_rotating_portfolio(self, base_df: pd.DataFrame, max_top_tickers: int | None = None, allow_short: bool | None = None) -> dict[str, Any]:
+        max_top_tickers = max_top_tickers or self.config.max_top_tickers
+        allow_short = self.config.allow_short if allow_short is None else allow_short
+        max_holding_days = self.config.horizon
+
+        cost = self.config.cost_bps / 10_000
+        max_positions = max_top_tickers
+
+        df = base_df.copy()
+        df = df.sort_values(["ticker", "Date"])
+        df["next_return"] = df.groupby("ticker")["Adj Close"].shift(-1) / df["Adj Close"] - 1.0
+        df = df.sort_values(["Date", "ticker"])
+
+        dates = list(sorted(pd.to_datetime(df["Date"]).unique()))
+        by_date = {date: group.copy() for date, group in df.groupby("Date", sort=True)}
+
+        holdings: dict[str, dict[str, Any]] = {}
+        daily_returns = []
+        daily_turnover = []
+        daily_holding_count = []
+
+        for date in dates[:-1]:
+            day = by_date[date].copy()
+            day = day.dropna(subset=["pred", "next_return", "Adj Close"])
+
+            if day.empty:
+                continue
+
+            # This one allows short signals even in long-only mode, but only for exit warnings.
+            exit_signal_day = self.add_cross_sectional_signals(
+                day,
+                "pred",
+                ["Date", "profile_group"],
+                max_top_tickers=max_top_tickers,
+                allow_short=True,
+            ).set_index("ticker", drop=False)
+
+            candidates = self._daily_candidate_pool(
+                day,
+                max_top_tickers=max_top_tickers,
+                allow_short=allow_short,
+            )
+
+            turnover = 0
+
+            # Exit holdings that disappeared, became weak, hit max age, or got opposite signal.
+            for ticker in list(holdings.keys()):
+                if ticker not in exit_signal_day.index:
+                    holdings.pop(ticker)
+                    turnover += 1
+                    continue
+
+                row = exit_signal_day.loc[ticker]
+                side = holdings[ticker]["side"]
+                age = holdings[ticker]["age"]
+
+                opposite_signal = row["pred_signal"] == -side
+                weak_long = side == 1 and row["pred"] <= self.config.exit_pred_threshold
+                weak_short = side == -1 and row["pred"] >= -self.config.exit_pred_threshold
+                too_old = age >= max_holding_days
+
+                if opposite_signal or weak_long or weak_short or too_old:
+                    holdings.pop(ticker)
+                    turnover += 1
+
+            # Add/replace holdings using today's strongest candidates.
+            for _, row in candidates.iterrows():
+                ticker = row["ticker"]
+                side = int(row["pred_signal"])
+                score = float(row["score"])
+
+                if ticker in holdings:
+                    holdings[ticker]["score"] = score
+                    holdings[ticker]["side"] = side
+                    continue
+
+                if len(holdings) < max_positions:
+                    holdings[ticker] = {"side": side, "score": score, "age": 0}
+                    turnover += 1
+                    continue
+
+                weakest_ticker = min(holdings, key=lambda t: holdings[t]["score"])
+                weakest_score = holdings[weakest_ticker]["score"]
+
+                if score > weakest_score + self.config.replace_buffer:
+                    holdings.pop(weakest_ticker)
+                    holdings[ticker] = {"side": side, "score": score, "age": 0}
+                    turnover += 2
+
+            if not holdings:
+                daily_returns.append(0.0)
+                daily_turnover.append(turnover)
+                daily_holding_count.append(0)
+                continue
+
+            day_indexed = day.set_index("ticker", drop=False)
+            position_returns = []
+
+            for ticker, info in holdings.items():
+                if ticker not in day_indexed.index:
+                    continue
+
+                next_return = day_indexed.loc[ticker, "next_return"]
+                if not np.isfinite(next_return):
+                    continue
+
+                position_returns.append(info["side"] * float(next_return))
+
+            gross_return = float(np.mean(position_returns)) if position_returns else 0.0
+            turnover_cost = cost * turnover / max(1, max_positions)
+            portfolio_return = gross_return - turnover_cost
+
+            daily_returns.append(portfolio_return)
+            daily_turnover.append(turnover)
+            daily_holding_count.append(len(holdings))
+
+            for info in holdings.values():
+                info["age"] += 1
+
+        if not daily_returns:
+            return {
+                "portfolio_days": 0,
+                "portfolio_total_return": 0.0,
+                "portfolio_cagr_like": 0.0,
+                "portfolio_sharpe_like": 0.0,
+                "portfolio_max_drawdown": 0.0,
+                "portfolio_win_rate": 0.0,
+                "portfolio_mean_daily_return": 0.0,
+                "portfolio_median_daily_return": 0.0,
+                "portfolio_avg_holdings": 0.0,
+                "portfolio_avg_turnover": 0.0,
+            }
+
+        returns = pd.Series(daily_returns, dtype=float)
+        equity = (1.0 + returns).cumprod()
+        drawdown = equity / equity.cummax() - 1.0
+
+        years = len(returns) / 252
+        total_return = equity.iloc[-1] - 1.0
+        cagr_like = equity.iloc[-1] ** (1 / years) - 1.0 if years > 0 else 0.0
+        sharpe_like = returns.mean() / (returns.std() + 1e-9) * np.sqrt(252)
+
+        return {
+            "portfolio_days": int(len(returns)),
+            "portfolio_total_return": float(total_return),
+            "portfolio_cagr_like": float(cagr_like),
+            "portfolio_sharpe_like": float(sharpe_like),
+            "portfolio_max_drawdown": float(drawdown.min()),
+            "portfolio_win_rate": float((returns > 0).mean()),
+            "portfolio_mean_daily_return": float(returns.mean()),
+            "portfolio_median_daily_return": float(returns.median()),
+            "portfolio_avg_holdings": float(np.mean(daily_holding_count)),
+            "portfolio_avg_turnover": float(np.mean(daily_turnover)),
+        }
+
+    def evaluate_top_n_variants(self, base_df: pd.DataFrame, max_top_values: list[int], allow_short: bool | None = None) -> dict[str, Any]:
+        results = {}
+
+        for max_top in max_top_values:
+            scored_df = self._apply_signals(
+                base_df,
+                pred=None,
+                max_top_tickers=max_top,
+                allow_short=allow_short,
+            )
+
+            row_metrics = self.evaluate_strategy(scored_df)
+            portfolio_metrics = self.evaluate_rotating_portfolio(
+                base_df,
+                max_top_tickers=max_top,
+                allow_short=allow_short,
+            )
+
+            results[f"top_{max_top}"] = {
+                **row_metrics,
+                "portfolio": portfolio_metrics,
+            }
+
+        return results
+
+
 
     @staticmethod
     def _get_lgbm_params(hyperparams: dict) -> dict:
@@ -338,48 +603,64 @@ class TrainingManager:
         defaults.update(cat_params)
         return defaults
 
-    def _train_lightgbm(self, hyperparams: dict) -> dict[str, Any]:
+    def _train_lightgbm(self, hyperparams: dict, max_top_values: list[int]) -> dict[str, Any]:
         params = self._get_lgbm_params(hyperparams)
         model = LGBMRegressor(random_state=self.seed, verbose=-1, **params)
 
         model.fit(self.X_train, self.y_train)
 
         pred = model.predict(self.X_test)
-        scored_df = self._apply_signals(self.test_df, pred)
 
+        base_df = self.test_df.copy()
+        base_df["pred"] = pred
+
+        scored_df = self._apply_signals(base_df)
         strategy_metrics = self.evaluate_strategy(scored_df)
+        portfolio_metrics = self.evaluate_rotating_portfolio(base_df)
+        variants = self.evaluate_top_n_variants(base_df, max_top_values)
 
         return {
             "type": "LGBM",
             "model": model,
             "test_df": scored_df,
+            "base_df": base_df,
             "mae": float(mean_absolute_error(self.y_test, pred)),
             "rmse": float(mean_squared_error(self.y_test, pred) ** 0.5),
             **strategy_metrics,
+            "portfolio": portfolio_metrics,
+            "top_n_variants": variants,
         }
 
-    def _train_catboost(self, hyperparams: dict) -> dict[str, Any]:
+    def _train_catboost(self, hyperparams: dict, max_top_values: list[int]) -> dict[str, Any]:
         params = self._get_cat_params(hyperparams)
         model = CatBoostRegressor(random_seed=self.seed, verbose=False, **params)
 
         model.fit(self.X_train, self.y_train)
 
         pred = model.predict(self.X_test)
-        scored_df = self._apply_signals(self.test_df, pred)
 
+        base_df = self.test_df.copy()
+        base_df["pred"] = pred
+
+        scored_df = self._apply_signals(base_df)
         strategy_metrics = self.evaluate_strategy(scored_df)
+        portfolio_metrics = self.evaluate_rotating_portfolio(base_df)
+        variants = self.evaluate_top_n_variants(base_df, max_top_values)
 
         return {
             "type": "CAT",
             "model": model,
             "test_df": scored_df,
+            "base_df": base_df,
             "mae": float(mean_absolute_error(self.y_test, pred)),
             "rmse": float(mean_squared_error(self.y_test, pred) ** 0.5),
             **strategy_metrics,
+            "portfolio": portfolio_metrics,
+            "top_n_variants": variants,
         }
 
-    def _save_model_assets(self, group, interval, results: dict, baselines: dict):
-        save_folder = Path(os.path.join(MODEL_DIR, f"Profile {group} ({interval})"))
+    def _save_model_assets(self, interval, results: dict, baselines: dict):
+        save_folder = Path(os.path.join(MODEL_DIR, f"Profile ({interval}) ({self.config.horizon})"))
         save_folder.mkdir(parents=True, exist_ok=True)
 
         metadata = {
@@ -394,7 +675,7 @@ class TrainingManager:
         for model_type, model_results in results.items():
             metadata["model_results"][model_type] = {
                 key: value for key, value in model_results.items()
-                if key not in {"model", "test_df"}
+                if key not in {"model", "test_df", "base_df"}
             }
 
             if model_type == "LGBM":
@@ -402,13 +683,10 @@ class TrainingManager:
             elif model_type == "CAT":
                 joblib.dump(model_results["model"], save_folder / "cat_model.joblib")
 
-            model_results["test_df"].to_parquet(save_folder / f"{model_type.lower()}_test_predictions.parquet", index=False)
-
         joblib.dump(self.feature_cols, save_folder / "features.joblib")
         (save_folder / "metadata.json").write_text(json.dumps(metadata, indent=4), encoding="utf-8")
 
-    @staticmethod
-    def rank_latest_predictions(scored_df: pd.DataFrame, top_n: int = 20) -> pd.DataFrame:
+    def rank_latest_predictions(self, scored_df: pd.DataFrame) -> pd.DataFrame:
         latest_date = scored_df["Date"].max()
         latest = scored_df[scored_df["Date"] == latest_date].copy()
 
@@ -420,21 +698,33 @@ class TrainingManager:
         cols = [c for c in cols if c in latest.columns]
         latest = latest[cols].sort_values("pred", ascending=False)
 
-        return pd.concat([latest.head(top_n), latest.tail(top_n)], axis=0)
+        top = latest.head(min(self.config.max_top_tickers, len(latest)))
+        bottom = latest.tail(min(self.config.max_top_tickers, len(latest)))
 
-    def run_training_pipeline(self, group, interval, status_signal: tuple | None = None, force_train: bool = True) -> bool:
-        def log_update(msg, force_print=False):
+        if len(latest) <= self.config.max_top_tickers * 2:
+            return latest
+        return pd.concat([top, bottom], axis=0)
+
+    def run_training_pipeline(self, interval, status_signal: tuple | None = None, force_train: bool = True) -> bool:
+        def log_update(msg, force_log=False):
             if status_signal:
                 u_queue, core_key = status_signal
                 u_queue.put((core_key, {"Current Task": msg}))
-                if force_print:
-                    print(msg)
-            elif Settings.LOGGING or force_print:
-                print(msg)
+                if force_log:
+                    log(msg)
+            elif Settings.LOGGING or force_log:
+                log(msg)
+
+        if interval == "1d":
+            self.config.horizon = 40
+            self.config.max_top_tickers = 30
+        elif interval == "1h":
+            self.config.horizon = 30
+            self.config.max_top_tickers = 10
 
         hyperparams = {}
 
-        save_folder = os.path.join(MODEL_DIR, f"Profile {group} ({interval})")
+        save_folder = os.path.join(MODEL_DIR, f"Profile ({interval})")
         if all_model_assets_exist(save_folder) and not force_train:
             log_update(f"Universe model already trained: {save_folder}", True)
             return True
@@ -444,37 +734,37 @@ class TrainingManager:
         t0 = time.perf_counter()
 
         log_update("Building universe dataframe...", True)
-        data = self._build_universe_frame(interval, group)
+        data = self._build_universe_frame(interval)
 
         log_update("Preparing pooled features...", True)
         self._prepare_data(data)
 
         baselines = self.evaluate_baselines()
-        print("Baselines:")
-        print(json.dumps(baselines, indent=4))
+        log("Baselines:")
+        log(json.dumps(baselines, indent=4))
 
         results = {}
 
         log_update("Training LightGBM...", True)
-        results["LGBM"] = self._train_lightgbm(hyperparams)
+        results["LGBM"] = self._train_lightgbm(hyperparams, [5,10,20,30])
         flush_memory()
-        print(json.dumps({k: v for k, v in results["LGBM"].items() if k not in {"model", "test_df"}}, indent=4))
+        log(json.dumps({k: v for k, v in results["LGBM"].items() if k not in {"model", "test_df", "base_df"}}, indent=4))
 
         log_update("Training CatBoost...", True)
-        results["CAT"] = self._train_catboost(hyperparams)
+        results["CAT"] = self._train_catboost(hyperparams, [5,10,20,30])
         flush_memory()
-        print(json.dumps({k: v for k, v in results["CAT"].items() if k not in {"model", "test_df"}}, indent=4))
+        log(json.dumps({k: v for k, v in results["CAT"].items() if k not in {"model", "test_df", "base_df"}}, indent=4))
 
         log_update("Saving assets...", True)
-        self._save_model_assets(group, interval, results, baselines)
+        self._save_model_assets(interval, results, baselines)
 
         best_model_type = max(results, key=lambda m: results[m].get("sharpe_like", -999))
-        latest = self.rank_latest_predictions(results[best_model_type]["test_df"], top_n=20)
+        latest = self.rank_latest_predictions(results[best_model_type]["test_df"])
 
-        print(f"Best model by sharpe_like: {best_model_type}")
-        print("Latest ranked predictions:")
-        print(latest.to_string(index=False))
-        print(f"Total time: {time.perf_counter() - t0:.1f}s")
+        log(f"Best model by sharpe_like: {best_model_type}")
+        log("Latest ranked predictions:")
+        log(latest.to_string(index=False))
+        log(f"Total time: {time.perf_counter() - t0:.1f}s")
 
         return True
 
@@ -490,9 +780,10 @@ if __name__ in "__main__":
     start = time.perf_counter()
 
     print("Training...")
-    success = TrainingManager().run_training_pipeline("A", "1d", force_train=True)
-    # print(success)
-    # print("Predicting...")
+    manager = TrainingManager()
+    success = manager.run_training_pipeline("1h", force_train=True)
+    # log(success)
+    # log("Predicting...")
     # run_prediction_pipeline("AAPL", "1d")
 
     print(time.perf_counter() - start)

@@ -1,0 +1,312 @@
+Building universe dataframe...
+Preparing pooled features...
+Features: 65
+Train rows: 1,172,656
+Test rows: 294,504
+Split date: 2026-02-18
+Baselines:
+{
+    "random": {
+        "trade_rate": 0.026213565859886455,
+        "long_rate": 0.026213565859886455,
+        "short_rate": 0.0,
+        "hit_rate": 0.4661917098445596,
+        "mean_return": -0.002197009998960318,
+        "median_return": -0.001782743265748293,
+        "sharpe_like": -0.31841776113918724,
+        "rank_ic_mean": 0.003832710105340553,
+        "rank_ic_ir": 0.10602907486645125,
+        "n_trades": 7720,
+        "long_stats": {
+            "hit_rate": 0.4661917098445596,
+            "mean_return": -0.002197009998960318,
+            "median_return": -0.001782743265748293,
+            "n": 7720
+        },
+        "short_stats": {
+            "hit_rate": 0.0,
+            "mean_return": 0.0,
+            "median_return": 0.0,
+            "n": 0
+        }
+    },
+    "momentum_1m": {
+        "trade_rate": 0.026213565859886455,
+        "long_rate": 0.026213565859886455,
+        "short_rate": 0.0,
+        "hit_rate": 0.46049222797927464,
+        "mean_return": -0.0017673113857792169,
+        "median_return": -0.0024538304985320643,
+        "sharpe_like": -0.20928886450047393,
+        "rank_ic_mean": -0.02746682638991846,
+        "rank_ic_ir": -0.1418145253529316,
+        "n_trades": 7720,
+        "long_stats": {
+            "hit_rate": 0.46049222797927464,
+            "mean_return": -0.0017673113857792169,
+            "median_return": -0.0024538304985320643,
+            "n": 7720
+        },
+        "short_stats": {
+            "hit_rate": 0.0,
+            "mean_return": 0.0,
+            "median_return": 0.0,
+            "n": 0
+        }
+    },
+    "reversal_1m": {
+        "trade_rate": 0.026213565859886455,
+        "long_rate": 0.026213565859886455,
+        "short_rate": 0.0,
+        "hit_rate": 0.4977979274611399,
+        "mean_return": 0.0015657066016952052,
+        "median_return": -0.00015680596016502506,
+        "sharpe_like": 0.2008990954827947,
+        "rank_ic_mean": 0.02746682638991846,
+        "rank_ic_ir": 0.1418145253529316,
+        "n_trades": 7720,
+        "long_stats": {
+            "hit_rate": 0.4977979274611399,
+            "mean_return": 0.0015657066016952052,
+            "median_return": -0.00015680596016502506,
+            "n": 7720
+        },
+        "short_stats": {
+            "hit_rate": 0.0,
+            "mean_return": 0.0,
+            "median_return": 0.0,
+            "n": 0
+        }
+    }
+}
+Training LightGBM...
+{
+    "type": "LGBM",
+    "mae": 0.022441638081638286,
+    "rmse": 0.034330197706678306,
+    "trade_rate": 0.024964007280036945,
+    "long_rate": 0.024964007280036945,
+    "short_rate": 0.0,
+    "hit_rate": 0.4967355821545158,
+    "mean_return": 0.001437282334393418,
+    "median_return": -0.0002016993144738459,
+    "sharpe_like": 0.15683530925205258,
+    "rank_ic_mean": 0.021155397920142868,
+    "rank_ic_ir": 0.12707646071983641,
+    "n_trades": 7352,
+    "long_stats": {
+        "hit_rate": 0.4967355821545158,
+        "mean_return": 0.001437282334393418,
+        "median_return": -0.0002016993144738459,
+        "n": 7352
+    },
+    "short_stats": {
+        "hit_rate": 0.0,
+        "mean_return": 0.0,
+        "median_return": 0.0,
+        "n": 0
+    },
+    "portfolio": {
+        "portfolio_days": 385,
+        "portfolio_total_return": 0.16817347925801318,
+        "portfolio_cagr_like": 0.10709942212262047,
+        "portfolio_sharpe_like": 0.7063300268522927,
+        "portfolio_max_drawdown": -0.10619052041744059,
+        "portfolio_win_rate": 0.522077922077922,
+        "portfolio_mean_daily_return": 0.0004558875659631566,
+        "portfolio_median_daily_return": 0.00014232380037244047,
+        "portfolio_avg_holdings": 19.88831168831169,
+        "portfolio_avg_turnover": 5.189610389610389
+    },
+    "top_n_variants": {
+        "top_5": {
+            "trade_rate": 0.006400592182109581,
+            "long_rate": 0.006400592182109581,
+            "short_rate": 0.0,
+            "hit_rate": 0.49018567639257293,
+            "mean_return": 0.002868116041846863,
+            "median_return": -0.0005433083983480231,
+            "sharpe_like": 0.34156251337723703,
+            "rank_ic_mean": 0.021155397920142868,
+            "rank_ic_ir": 0.12707646071983641,
+            "n_trades": 1885,
+            "long_stats": {
+                "hit_rate": 0.49018567639257293,
+                "mean_return": 0.002868116041846863,
+                "median_return": -0.0005433083983480231,
+                "n": 1885
+            },
+            "short_stats": {
+                "hit_rate": 0.0,
+                "mean_return": 0.0,
+                "median_return": 0.0,
+                "n": 0
+            },
+            "portfolio": {
+                "portfolio_days": 385,
+                "portfolio_total_return": 0.37852054165082727,
+                "portfolio_cagr_like": 0.23382141498235742,
+                "portfolio_sharpe_like": 1.1395015141011118,
+                "portfolio_max_drawdown": -0.1421453013640872,
+                "portfolio_win_rate": 0.522077922077922,
+                "portfolio_mean_daily_return": 0.0009142698758009491,
+                "portfolio_median_daily_return": 0.0005090245703887719,
+                "portfolio_avg_holdings": 4.976623376623377,
+                "portfolio_avg_turnover": 1.5246753246753246
+            }
+        },
+        "top_10": {
+            "trade_rate": 0.012678944937929535,
+            "long_rate": 0.012678944937929535,
+            "short_rate": 0.0,
+            "hit_rate": 0.48419925013390464,
+            "mean_return": 0.0008267573374442411,
+            "median_return": -0.0008015662499441313,
+            "sharpe_like": 0.08976919581255025,
+            "rank_ic_mean": 0.021155397920142868,
+            "rank_ic_ir": 0.12707646071983641,
+            "n_trades": 3734,
+            "long_stats": {
+                "hit_rate": 0.48419925013390464,
+                "mean_return": 0.0008267573374442411,
+                "median_return": -0.0008015662499441313,
+                "n": 3734
+            },
+            "short_stats": {
+                "hit_rate": 0.0,
+                "mean_return": 0.0,
+                "median_return": 0.0,
+                "n": 0
+            },
+            "portfolio": {
+                "portfolio_days": 385,
+                "portfolio_total_return": 0.25521041950386425,
+                "portfolio_cagr_like": 0.16041800776370918,
+                "portfolio_sharpe_like": 0.9185719459393656,
+                "portfolio_max_drawdown": -0.11456708706227903,
+                "portfolio_win_rate": 0.522077922077922,
+                "portfolio_mean_daily_return": 0.0006539182552798631,
+                "portfolio_median_daily_return": 0.00040549727422922754,
+                "portfolio_avg_holdings": 9.953246753246754,
+                "portfolio_avg_turnover": 2.81038961038961
+            }
+        },
+        "top_20": {
+            "trade_rate": 0.024964007280036945,
+            "long_rate": 0.024964007280036945,
+            "short_rate": 0.0,
+            "hit_rate": 0.4967355821545158,
+            "mean_return": 0.001437282334393418,
+            "median_return": -0.0002016993144738459,
+            "sharpe_like": 0.15683530925205258,
+            "rank_ic_mean": 0.021155397920142868,
+            "rank_ic_ir": 0.12707646071983641,
+            "n_trades": 7352,
+            "long_stats": {
+                "hit_rate": 0.4967355821545158,
+                "mean_return": 0.001437282334393418,
+                "median_return": -0.0002016993144738459,
+                "n": 7352
+            },
+            "short_stats": {
+                "hit_rate": 0.0,
+                "mean_return": 0.0,
+                "median_return": 0.0,
+                "n": 0
+            },
+            "portfolio": {
+                "portfolio_days": 385,
+                "portfolio_total_return": 0.16817347925801318,
+                "portfolio_cagr_like": 0.10709942212262047,
+                "portfolio_sharpe_like": 0.7063300268522927,
+                "portfolio_max_drawdown": -0.10619052041744059,
+                "portfolio_win_rate": 0.522077922077922,
+                "portfolio_mean_daily_return": 0.0004558875659631566,
+                "portfolio_median_daily_return": 0.00014232380037244047,
+                "portfolio_avg_holdings": 19.88831168831169,
+                "portfolio_avg_turnover": 5.189610389610389
+            }
+        },
+        "top_30": {
+            "trade_rate": 0.024964007280036945,
+            "long_rate": 0.024964007280036945,
+            "short_rate": 0.0,
+            "hit_rate": 0.4967355821545158,
+            "mean_return": 0.001437282334393418,
+            "median_return": -0.0002016993144738459,
+            "sharpe_like": 0.15683530925205258,
+            "rank_ic_mean": 0.021155397920142868,
+            "rank_ic_ir": 0.12707646071983641,
+            "n_trades": 7352,
+            "long_stats": {
+                "hit_rate": 0.4967355821545158,
+                "mean_return": 0.001437282334393418,
+                "median_return": -0.0002016993144738459,
+                "n": 7352
+            },
+            "short_stats": {
+                "hit_rate": 0.0,
+                "mean_return": 0.0,
+                "median_return": 0.0,
+                "n": 0
+            },
+            "portfolio": {
+                "portfolio_days": 385,
+                "portfolio_total_return": 0.11997946107025115,
+                "portfolio_cagr_like": 0.07698640218794939,
+                "portfolio_sharpe_like": 0.6105245563648806,
+                "portfolio_max_drawdown": -0.09891508180871222,
+                "portfolio_win_rate": 0.5038961038961038,
+                "portfolio_mean_daily_return": 0.000331085629469694,
+                "portfolio_median_daily_return": 0.00011173237692441173,
+                "portfolio_avg_holdings": 29.594805194805193,
+                "portfolio_avg_turnover": 7.132467532467532
+            }
+        }
+    }
+}
+Saving assets...
+Best model by sharpe_like: LGBM
+Latest ranked predictions:
+               Date ticker profile_group      pred  pred_signal  target_excess_return  future_return  benchmark_future_return
+2026-05-07 16:30:00   QUBT         vol_5  0.043377            1              0.000757       0.021657                 0.009451
+2026-05-07 16:30:00   NVTS         vol_5  0.039449            1              0.185852       0.211122                 0.009451
+2026-05-07 16:30:00   HYMC         vol_5  0.037247            1             -0.036640      -0.025803                 0.009451
+2026-05-07 16:30:00   FSLY         vol_5  0.032200            1              0.075775       0.089804                 0.009451
+2026-05-07 16:30:00   INSM         vol_5  0.019361            0             -0.062093      -0.055561                 0.009451
+2026-05-07 16:30:00   CVNA         vol_5  0.017356            0             -0.027401      -0.006160                 0.009451
+2026-05-07 16:30:00   ONDS         vol_5  0.016270            0              0.008712       0.030096                 0.009451
+2026-05-07 16:30:00   EOSE         vol_5  0.014821            0              0.252475       0.271644                 0.009451
+2026-05-07 16:30:00     QS         vol_5  0.014141            0              0.012575       0.028821                 0.009451
+2026-05-07 16:30:00   COHR         vol_5  0.013578            0              0.038621       0.063020                 0.009451
+2026-05-07 16:30:00   PLNT         vol_3  0.012387            1              0.053064       0.058715                 0.009451
+2026-05-07 16:30:00    RDW         vol_5  0.012375            0              0.186454       0.212836                 0.009451
+2026-05-07 16:30:00   UAMY         vol_5  0.011822            0             -0.060167      -0.041817                 0.009451
+2026-05-07 16:30:00   PRIM         vol_5  0.010653            0             -0.033790      -0.020653                 0.009451
+2026-05-07 16:30:00   RCAT         vol_5  0.010190            0             -0.002989       0.019637                 0.009451
+2026-05-07 16:30:00   SEDG         vol_5  0.009862            0              0.057940       0.074402                 0.009451
+2026-05-07 16:30:00    SMR         vol_5  0.009456            0             -0.025736       0.001999                 0.009451
+2026-05-07 16:30:00    SYM         vol_5  0.008460            0             -0.138849      -0.116110                 0.009451
+2026-05-07 16:30:00   CENX         vol_5  0.008253            0             -0.042919      -0.025972                 0.009451
+2026-05-07 16:30:00    RUN         vol_5  0.008201            0              0.006450       0.020950                 0.009451
+2026-05-07 16:30:00   CGNX         vol_4 -0.004402            0             -0.029311      -0.016261                 0.009451
+2026-05-07 16:30:00    WAT         vol_3 -0.004474            0              0.027186       0.036329                 0.009451
+2026-05-07 16:30:00   TSLA         vol_5 -0.004578            0              0.034094       0.055690                 0.009451
+2026-05-07 16:30:00    IQV         vol_3 -0.004832            0             -0.010218      -0.000028                 0.009451
+2026-05-07 16:30:00   AAPL         vol_2 -0.004884            0              0.004665       0.015635                 0.009451
+2026-05-07 16:30:00   SITM         vol_5 -0.005093            0              0.066704       0.092247                 0.009451
+2026-05-07 16:30:00    GLW         vol_4 -0.005327            0              0.005533       0.018480                 0.009451
+2026-05-07 16:30:00    ROK         vol_3 -0.005329            0             -0.006051       0.005494                 0.009451
+2026-05-07 16:30:00   TEAM         vol_5 -0.005428            0             -0.027579      -0.015270                 0.009451
+2026-05-07 16:30:00   OSCR         vol_5 -0.005852            0              0.033241       0.044385                 0.009451
+2026-05-07 16:30:00    GFS         vol_4 -0.006659            0              0.024490       0.040725                 0.009451
+2026-05-07 16:30:00     BE         vol_5 -0.007380            0             -0.034346      -0.015203                 0.009451
+2026-05-07 16:30:00    AMD         vol_5 -0.009655            0              0.107454       0.127661                 0.009451
+2026-05-07 16:30:00   QCOM         vol_4 -0.010012            0              0.071893       0.087274                 0.009451
+2026-05-07 16:30:00   FLEX         vol_4 -0.010544            0              0.031807       0.048834                 0.009451
+2026-05-07 16:30:00     MU         vol_5 -0.010806            0              0.147955       0.169581                 0.009451
+2026-05-07 16:30:00   INTC         vol_5 -0.011577            0              0.117101       0.135120                 0.009451
+2026-05-07 16:30:00   RIOT         vol_5 -0.012078            0              0.022040       0.048781                 0.009451
+2026-05-07 16:30:00   SMCI         vol_5 -0.012805            0              0.048737       0.070683                 0.009451
+2026-05-07 16:30:00   RMBS         vol_5 -0.013405            0              0.012534       0.036162                 0.009451
+Total time: 178.8s
