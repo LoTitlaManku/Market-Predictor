@@ -59,17 +59,6 @@ class LSTMBrain(nn.Module):
         return self.fc(out)
 
 
-class ConstantRegressor:
-    def __init__(self, value: float):
-        self.value = float(value)
-
-    def fit(self, X, y=None):
-        return self
-
-    def predict(self, X):
-        return np.full(len(X), self.value, dtype=np.float32)
-
-
 class PurgedTimeSeriesSplit:
     def __init__(self, n_splits: int = 4, gap: int = 4, embargo_pct: float = 0.01):
         self.n_splits = n_splits
@@ -115,8 +104,9 @@ class TrainingManager:
     def _prepare_data(self, df: pd.DataFrame):
         drop_cols = {
             "Open", "High", "Low", "Close", "Adj Close", "Volume", "MA_200",
+            "Adj Open", "Adj High", "Adj Low",
             "return", "target_profit", "tbm_return", "barrier_strength",
-            "time_to_gain", "time_to_loss", "tp_return", "sl_return"
+            "time_to_gain", "time_to_loss", "tp_return", "sl_return",
         }
 
         self.feature_cols = [c for c in df.columns if c not in drop_cols]
@@ -147,9 +137,10 @@ class TrainingManager:
 
         edge = loss_time - gain_time
         soonest = np.minimum(gain_time, loss_time)
+        confidence = np.abs(edge) / (soonest + 1e-9)
 
         signal = np.zeros(len(predicted_times), dtype=int)
-        trade_mask = (soonest <= 20) & (np.abs(edge) >= 0.75)
+        trade_mask = (soonest <= 10) & (np.abs(edge) >= 6) & (confidence >= 0.8)
 
         signal[trade_mask & (edge > 0)] = 1
         signal[trade_mask & (edge < 0)] = -1
@@ -333,6 +324,11 @@ class TrainingManager:
 
         mae = mean_absolute_error(self.y_test, test_times)
 
+        pred_signal = self.times_to_signal(test_times)
+        vals, counts = np.unique(pred_signal, return_counts=True)
+        print("pred signal distribution:", dict(zip(vals, counts)))
+        print("pred signal ratios:", dict(zip(vals, counts / len(pred_signal))))
+
         return {
             "type": "LGBM",
             "gain_model": gain_model,
@@ -382,6 +378,11 @@ class TrainingManager:
         )
 
         mae = mean_absolute_error(self.y_test, test_times)
+
+        pred_signal = self.times_to_signal(test_times)
+        vals, counts = np.unique(pred_signal, return_counts=True)
+        print("pred signal distribution:", dict(zip(vals, counts)))
+        print("pred signal ratios:", dict(zip(vals, counts / len(pred_signal))))
 
         return {
             "type": "CAT",
@@ -458,6 +459,11 @@ class TrainingManager:
         )
 
         mae = mean_absolute_error(y_test_seq, test_times)
+
+        pred_signal = self.times_to_signal(test_times)
+        vals, counts = np.unique(pred_signal, return_counts=True)
+        print("pred signal distribution:", dict(zip(vals, counts)))
+        print("pred signal ratios:", dict(zip(vals, counts / len(pred_signal))))
 
         return {
             "type": "LSTM",
@@ -537,13 +543,13 @@ class TrainingManager:
             log_update(f"Insufficient processed data for {ticker} ({interval}) — need 300+, got {len(df)}", True)
             return False
 
-        for col in ["time_to_gain", "time_to_loss"]:
-            vals, counts = np.unique(df[col], return_counts=True)
-            print(col)
-            for v, c in zip(vals, counts):
-                print(v, c, round(c / len(df), 3))
+        print("target_profit distribution")
+        vals, counts = np.unique(df["target_profit"], return_counts=True)
+        print(dict(zip(vals, counts)))
+        print(dict(zip(vals, counts / len(df))))
 
-        exit()
+        print("median time_to_gain:", df["time_to_gain"].median())
+        print("median time_to_loss:", df["time_to_loss"].median())
 
         log_update("Preparing features...", True)
         self._prepare_data(df)

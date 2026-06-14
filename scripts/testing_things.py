@@ -562,7 +562,7 @@ if __name__ in "__main__":
 
     from predictor import TrainingManager
     print("Training...")
-    success = TrainingManager().run_training_pipeline("AAPL", "1d")
+    success = TrainingManager().run_training_pipeline("AAPL", "1d", force_train=True)
     print(success)
     # print("Predicting...")
     # run_prediction_pipeline("AAPL", "1d")

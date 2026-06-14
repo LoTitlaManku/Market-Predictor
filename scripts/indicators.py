@@ -221,8 +221,8 @@ class TechnicalAnalysisAccessor:
         atr = df["ATR"].to_numpy(dtype=float)
 
         rolling_window = 252 if interval == "1d" else 1000
-        up_quantile = 0.40
-        down_quantile = 0.25
+        up_quantile = 0.45
+        down_quantile = 0.45
         atr_return = pd.Series(atr / close, index=df.index).replace([np.inf, -np.inf], np.nan)
 
         future_max_return = np.full(n, np.nan, dtype=float)
@@ -260,23 +260,23 @@ class TechnicalAnalysisAccessor:
         ).quantile(down_quantile)
 
         adaptive_up = adaptive_up.fillna(fallback_up).clip(
-            lower=atr_return * 0.35,
+            lower=atr_return * 0.5,
             upper=atr_return * 3.0
         )
 
         adaptive_down = adaptive_down.fillna(fallback_down).clip(
-            lower=atr_return * 0.5,
-            upper=atr_return * 2.0
+            lower=atr_return * 1.1,
+            upper=atr_return * 2.5
         )
 
         adaptive_up = adaptive_up.to_numpy(dtype=float)
         adaptive_down = adaptive_down.to_numpy(dtype=float)
 
-        print("ATR return median:", np.nanmedian(atr_return))
-        print("Adaptive up median:", np.nanmedian(adaptive_up))
-        print("Adaptive down median:", np.nanmedian(adaptive_down))
-        print("Future max median:", np.nanmedian(future_max_return))
-        print("Future min median:", np.nanmedian(future_min_return))
+        # print("ATR return median:", np.nanmedian(atr_return))
+        # print("Adaptive up median:", np.nanmedian(adaptive_up))
+        # print("Adaptive down median:", np.nanmedian(adaptive_down))
+        # print("Future max median:", np.nanmedian(future_max_return))
+        # print("Future min median:", np.nanmedian(future_min_return))
 
         for i in range(n - window):
             entry = close[i]
@@ -362,7 +362,7 @@ class TechnicalAnalysisAccessor:
 
         df = pd.merge_asof(
             df,
-            vix_data[['Close']].rename(columns={'Close': 'VIX_Level'}),
+            vix_data[['Adj Close']].rename(columns={'Adj Close': 'VIX_Level'}),
             left_index=True,
             right_index=True,
             direction='backward'
@@ -407,7 +407,7 @@ class TechnicalAnalysisAccessor:
 
         aligned_vvix = vvix_data.reindex(df.index).ffill().bfill()
 
-        df['VVIX_Level'] = aligned_vvix['Close']
+        df['VVIX_Level'] = aligned_vvix['Adj Close']
         df['VIX_Quality_Ratio'] = df['VVIX_Level'] / df['VIX_Level']
 
         return df
@@ -422,7 +422,7 @@ class TechnicalAnalysisAccessor:
 
         df = pd.merge_asof(
             df,
-            tyx_data[['Close']].rename(columns={'Close': 'Treasury_30Y'}),
+            tyx_data[['Adj Close']].rename(columns={'Adj Close': 'Treasury_30Y'}),
             left_index=True,
             right_index=True,
             direction='backward'
