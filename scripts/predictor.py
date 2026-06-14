@@ -143,22 +143,22 @@ class TrainingManager:
         top_results.sort(key=lambda r: r["score"], reverse=True)
         return top_results[:top_k]
 
-    def tune_lightgbm(self, n_trials: int = 20) -> list:
+    def tune_lightgbm(self, interval, n_trials: int = 20) -> list:
         log(f"Tuning LightGBM with {n_trials} trials...")
 
         X_tune_train, y_tune_train, X_tune_val, y_tune_val, tune_val_df = self._make_tuning_split()
 
         def objective(trial):
             sampled_params = {
-                "n_estimators": trial.suggest_categorical("n_estimators", [300, 500, 700]),
-                "learning_rate": trial.suggest_float("learning_rate", 0.015, 0.05, log=True),
-                "max_depth": trial.suggest_categorical("max_depth", [4, 5, 6, 8]),
-                "num_leaves": trial.suggest_categorical("num_leaves", [31, 63, 127]),
-                "min_child_samples": trial.suggest_categorical("min_child_samples", [100, 150, 200, 300]),
-                "subsample": trial.suggest_categorical("subsample", [0.85, 1.0]),
-                "colsample_bytree": trial.suggest_categorical("colsample_bytree", [0.75, 0.85, 1.0]),
-                "reg_alpha": trial.suggest_categorical("reg_alpha", [0.1, 0.5, 1.0]),
-                "reg_lambda": trial.suggest_categorical("reg_lambda", [0.5, 1.0, 2.0]),
+                "n_estimators": trial.suggest_categorical("n_estimators", [700, 900, 1100]),
+                "learning_rate": trial.suggest_float("learning_rate", 0.028, 0.052, log=True),
+                "max_depth": trial.suggest_categorical("max_depth", [6, 8, 10]),
+                "num_leaves": trial.suggest_categorical("num_leaves", [31, 63]),
+                "min_child_samples": trial.suggest_categorical("min_child_samples", [100, 150, 200]),
+                "subsample": trial.suggest_categorical("subsample", [0.8, 0.85, 0.9]),
+                "colsample_bytree": trial.suggest_categorical("colsample_bytree", [0.85, 1.0]),
+                "reg_alpha": trial.suggest_categorical("reg_alpha", [0.05, 0.1, 0.25, 0.5]),
+                "reg_lambda": trial.suggest_categorical("reg_lambda", [0.5, 1.0, 1.5, 2.0]),
             }
 
             params = self._get_lgbm_params({"LGBM": {"best_params": sampled_params}})
@@ -203,9 +203,9 @@ class TrainingManager:
             return score
 
         study = optuna.create_study(
-            study_name="lgbm_optuna",
+            study_name=f"lgbm_optuna_{interval}",
             direction="maximize",
-            storage=f"sqlite:///lgbm_optuna.db",
+            storage=f"sqlite:///lgbm_optuna_{interval}.db",
             load_if_exists=True,
         )
 
@@ -233,22 +233,20 @@ class TrainingManager:
 
         return top_results
 
-    def tune_catboost(self, n_trials: int = 75, study_name: str = "catboost_tuning") -> list[dict[str, Any]]:
-        import optuna
-
+    def tune_catboost(self, interval, n_trials: int = 75) -> list[dict[str, Any]]:
         log(f"Tuning CatBoost with Optuna for {n_trials} trials...")
 
         X_tune_train, y_tune_train, X_tune_val, y_tune_val, tune_val_df = self._make_tuning_split()
 
         def objective(trial):
             sampled_params = {
-                "iterations": trial.suggest_categorical("iterations", [500, 700, 1000]),
-                "learning_rate": trial.suggest_float("learning_rate", 0.02, 0.06, log=True),
-                "depth": trial.suggest_categorical("depth", [4, 5, 6]),
-                "l2_leaf_reg": trial.suggest_categorical("l2_leaf_reg", [3.0, 5.0, 10.0]),
-                "random_strength": trial.suggest_categorical("random_strength", [0.5, 1.0, 2.0]),
-                "bagging_temperature": trial.suggest_categorical("bagging_temperature", [1.0, 2.0, 3.0]),
-                "border_count": trial.suggest_categorical("border_count", [64, 128, 254]),
+                "iterations": trial.suggest_categorical("iterations", [700, 1000, 1200]),
+                "learning_rate": trial.suggest_float("learning_rate", 0.026, 0.045, log=True),
+                "depth": trial.suggest_categorical("depth", [5, 6, 7]),
+                "l2_leaf_reg": trial.suggest_categorical("l2_leaf_reg", [3.0, 5.0, 7.0, 10.0]),
+                "random_strength": trial.suggest_categorical("random_strength", [1.0, 2.0, 3.0]),
+                "bagging_temperature": trial.suggest_categorical("bagging_temperature", [0.5, 1.0, 1.5]),
+                "border_count": trial.suggest_categorical("border_count", [128, 254]),
             }
 
             params = self._get_cat_params({"CAT": {"best_params": sampled_params}})
@@ -312,9 +310,9 @@ class TrainingManager:
                 flush_memory()
 
         study = optuna.create_study(
-            study_name=study_name,
+            study_name=f"cat_optuna_{interval}",
             direction="maximize",
-            storage=f"sqlite:///{study_name}.db",
+            storage=f"sqlite:///cat_optuna_{interval}.db",
             load_if_exists=True,
         )
 
@@ -350,7 +348,8 @@ class TrainingManager:
 
         return top_results
 
-    def run_tuning_pipeline(self, interval, force_train: bool = True) -> bool:
+    def run_tuning_pipeline(self, interval) -> bool:
+        log(f"{'='*50}\nSTARTING {interval}\n{'=' * 50}")
         if interval == "1d":
             self.config.horizon = 40
             self.config.max_top_tickers = 30
@@ -366,7 +365,7 @@ class TrainingManager:
         log("DEBUG: finished _prepare_data")
         print("DEBUG: finished _prepare_data", flush=True)
 
-        top_lgbm_results = self.tune_lightgbm(n_trials=30)
+        top_lgbm_results = self.tune_lightgbm(interval, n_trials=100)
         with open(f"lgbm_top_results_{interval}.json", "w") as f:
             json.dump(top_lgbm_results, f, indent=4)
 
@@ -374,7 +373,7 @@ class TrainingManager:
         with open(f"lgbm_params_{interval}.json", "w") as f:
             json.dump(best_lgbm_params, f, indent=4)
 
-        top_cat_results = self.tune_catboost(n_trials=30)
+        top_cat_results = self.tune_catboost(interval, n_trials=100)
         with open(f"cat_top_results_{interval}.json", "w") as f:
             json.dump(top_cat_results, f, indent=4)
 
@@ -1053,6 +1052,9 @@ if __name__ in "__main__":
 
     print("Training...")
     manager = TrainingManager()
-    success = manager.run_tuning_pipeline("1d", force_train=True)
+    manager.run_tuning_pipeline("1d")
+
+    manager = TrainingManager()
+    manager.run_tuning_pipeline("1h")
 
     print(time.perf_counter() - start)
