@@ -15,15 +15,11 @@ from yfinance import shared
 from tqdm import tqdm
 
 # Custom imports
-from scripts.config import CACHE_DIR, LEDGER_DIR, DATA_DIR, IMG_DIR
+from scripts.config import CACHE_DIR, LEDGER_DIR, DATA_DIR
 
 NYSE_CAL = mcal.get_calendar('NYSE')
 
 ############################################################################
-
-# Helper function to find the absolute path of image files
-def abs_file(file: str) -> str:
-    return os.path.join(IMG_DIR, file).replace("\\", "/")
 
 # Helper function to load data for a stock
 def load_data(ticker: str, interval: str = "1d") -> pd.DataFrame | None:
