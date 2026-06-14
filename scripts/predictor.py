@@ -20,7 +20,6 @@ import torch
 from catboost import CatBoostRegressor
 from lightgbm import LGBMRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error
-from sklearn.model_selection import ParameterSampler
 import optuna
 
 from scripts.config import DATA_DIR, MODEL_DIR
@@ -234,7 +233,7 @@ class TrainingManager:
 
         return top_results
 
-    def tune_catboost_optuna(self, n_trials: int = 75, study_name: str = "catboost_tuning") -> list[dict[str, Any]]:
+    def tune_catboost(self, n_trials: int = 75, study_name: str = "catboost_tuning") -> list[dict[str, Any]]:
         import optuna
 
         log(f"Tuning CatBoost with Optuna for {n_trials} trials...")
