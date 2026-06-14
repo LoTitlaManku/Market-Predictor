@@ -11,10 +11,10 @@ tt=10
 
 cd ~/Market-Predictor
 
-nohup uv run -m scripts.hyperparameter_tuning > training.log 2>&1 &
+uv run -m scripts.predictor
 
-ps aux | grep hyperparameter_tuning
+nohup uv run -m scripts.predictor > training.log 2>&1 &
+
+ps aux | grep predictor
 
 cat training.log
-
-cat 'results/tuned_Profile A_1h.json'
