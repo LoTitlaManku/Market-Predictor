@@ -291,16 +291,7 @@ class TrainingManager:
 
         return best_params
 
-    def run_tuning_pipeline(self, interval, status_signal: tuple | None = None, force_train: bool = True) -> bool:
-        def log_update(msg, force_log=False):
-            if status_signal:
-                u_queue, core_key = status_signal
-                u_queue.put((core_key, {"Current Task": msg}))
-                if force_log:
-                    log(msg)
-            elif Settings.LOGGING or force_log:
-                log(msg)
-
+    def run_tuning_pipeline(self, interval, force_train: bool = True) -> bool:
         if interval == "1d":
             self.config.horizon = 40
             self.config.max_top_tickers = 30
@@ -308,11 +299,13 @@ class TrainingManager:
             self.config.horizon = 30
             self.config.max_top_tickers = 10
 
-        log_update("Building universe dataframe...", True)
+        log("Building universe dataframe...")
         data = self._build_universe_frame(interval)
 
-        log_update("Preparing pooled features...", True)
+        log("Preparing pooled features...")
         self._prepare_data(data)
+        log("DEBUG: finished _prepare_data")
+        print("DEBUG: finished _prepare_data", flush=True)
 
         best_lgbm_params = self.tune_lightgbm(n_trials=5)
         with open(f"lgbm_params_{interval}.json", "w") as f:
@@ -922,14 +915,9 @@ class TrainingManager:
             return latest
         return pd.concat([top, bottom], axis=0)
 
-    def run_training_pipeline(self, interval, status_signal: tuple | None = None, force_train: bool = True) -> bool:
-        def log_update(msg, force_log=False):
-            if status_signal:
-                u_queue, core_key = status_signal
-                u_queue.put((core_key, {"Current Task": msg}))
-                if force_log:
-                    log(msg)
-            elif Settings.LOGGING or force_log:
+    def run_training_pipeline(self, interval, force_train: bool = True) -> bool:
+        def log_update(msg):
+            if Settings.LOGGING:
                 log(msg)
 
         if interval == "1d":
@@ -943,17 +931,17 @@ class TrainingManager:
 
         save_folder = os.path.join(MODEL_DIR, f"Profile ({interval})")
         if all_model_assets_exist(save_folder) and not force_train:
-            log_update(f"Universe model already trained: {save_folder}", True)
+            log_update(f"Universe model already trained: {save_folder}")
             return True
 
         if os.path.exists(save_folder): shutil.rmtree(save_folder)
 
         t0 = time.perf_counter()
 
-        log_update("Building universe dataframe...", True)
+        log_update("Building universe dataframe...")
         data = self._build_universe_frame(interval)
 
-        log_update("Preparing pooled features...", True)
+        log_update("Preparing pooled features...")
         self._prepare_data(data)
 
         baselines = self.evaluate_baselines()
@@ -962,17 +950,17 @@ class TrainingManager:
 
         results = {}
 
-        log_update("Training LightGBM...", True)
+        log_update("Training LightGBM...")
         results["LGBM"] = self._train_lightgbm(hyperparams, [5,10,20,30])
         flush_memory()
         log(json.dumps({k: v for k, v in results["LGBM"].items() if k not in {"model", "test_df", "base_df"}}, indent=4))
 
-        log_update("Training CatBoost...", True)
+        log_update("Training CatBoost...")
         results["CAT"] = self._train_catboost(hyperparams, [5,10,20,30])
         flush_memory()
         log(json.dumps({k: v for k, v in results["CAT"].items() if k not in {"model", "test_df", "base_df"}}, indent=4))
 
-        log_update("Saving assets...", True)
+        log_update("Saving assets...")
         self._save_model_assets(interval, results, baselines)
 
         best_model_type = max(results, key=lambda m: results[m].get("sharpe_like", -999))

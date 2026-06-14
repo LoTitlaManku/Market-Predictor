@@ -2,7 +2,7 @@
 name = "stock-market-predictor"
 version = "2.0.0"
 description = "Predict the stock market."
-requires-python = ">=3.12"
+requires-python = ">=3.12,<3.13"
 dependencies = [
     "bcrypt>=5.0.0",
     "catboost>=1.2.10",
