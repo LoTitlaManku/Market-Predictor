@@ -628,9 +628,29 @@ def build_profile_map():
 
 ########################################################################################################################
 
+def updates(sent, spy, cache):
+    from data_management import UpdateWorker
+    updater = UpdateWorker()
+    if sent:
+        print("--- Updating Global Sentiment ---")
+        updater.sentiment_update()
+    if spy:
+        print("--- Updating Global Comparison data ---")
+        updater.update_comparatives()
+    if cache:
+        print(f"--- Updating Prices for tickers ---")
+        updater.data_updater()
+
+
 if __name__ in "__main__":
     import time
     start = time.perf_counter()
+
+    # updates(  # Whether to update:
+    #     sent=True,  # News sentiment
+    #     spy=True,  # Market sentiment indicators
+    #     cache=True,  # Stock cache
+    # )
 
     # from predictor import TrainingManager
     # print("Training...")

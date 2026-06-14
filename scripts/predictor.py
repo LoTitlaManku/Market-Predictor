@@ -20,6 +20,7 @@ import torch
 from catboost import CatBoostRegressor
 from lightgbm import LGBMRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error
+from sklearn.model_selection import ParameterSampler
 
 from scripts.config import DATA_DIR, MODEL_DIR
 from scripts.data_management import load_data
@@ -55,8 +56,7 @@ def flush_memory():
         torch.cuda.empty_cache()
 
 def log(string: str):
-    global hor
-    with open(f"testing/{hor}.txt", "a") as f:
+    with open(f"testing.txt", "a") as f:
         f.write(f"{string}\n")
 
 ########################################################################################################################
@@ -109,6 +109,223 @@ class TrainingManager:
         self.X_test = None
         self.y_train = None
         self.y_test = None
+
+    # Hypers
+    def _make_tuning_split(self, validation_size: float = 0.2):
+        unique_dates = np.array(sorted(pd.to_datetime(self.train_df["Date"]).unique()))
+        split_date = unique_dates[int(len(unique_dates) * (1 - validation_size))]
+
+        tune_train_df = self.train_df[self.train_df["Date"] <= split_date].copy()
+        tune_val_df = self.train_df[self.train_df["Date"] > split_date].copy()
+
+        X_tune_train = tune_train_df[self.feature_cols].values
+        y_tune_train = tune_train_df["target_excess_return"].values.astype(np.float32)
+
+        X_tune_val = tune_val_df[self.feature_cols].values
+        y_tune_val = tune_val_df["target_excess_return"].values.astype(np.float32)
+
+        return X_tune_train, y_tune_train, X_tune_val, y_tune_val, tune_val_df
+
+    def tune_lightgbm(self, n_trials: int = 20) -> dict:
+        log(f"Tuning LightGBM with {n_trials} trials...")
+
+        X_tune_train, y_tune_train, X_tune_val, y_tune_val, tune_val_df = self._make_tuning_split()
+
+        param_space = {
+            "n_estimators": [300, 500, 700, 1000],
+            "learning_rate": [0.01, 0.02, 0.025, 0.035, 0.05],
+            "max_depth": [3, 4, 5, 6, 8],
+            "num_leaves": [15, 31, 63, 127],
+            "min_child_samples": [30, 50, 80, 120, 200],
+            "subsample": [0.6, 0.75, 0.85, 1.0],
+            "colsample_bytree": [0.6, 0.75, 0.85, 1.0],
+            "reg_alpha": [0.0, 0.05, 0.1, 0.5, 1.0],
+            "reg_lambda": [0.5, 1.0, 2.0, 5.0, 10.0],
+        }
+
+        sampler = list(ParameterSampler(param_space, n_iter=n_trials, random_state=self.seed))
+
+        best_score = -np.inf
+        best_params = None
+        best_result = None
+
+        for i, sampled_params in enumerate(sampler, start=1):
+            params = self._get_lgbm_params({"LGBM": {"best_params": sampled_params}})
+            model = LGBMRegressor(random_state=self.seed, verbose=-1, **params)
+
+            try:
+                model.fit(X_tune_train, y_tune_train)
+                pred = model.predict(X_tune_val)
+
+                base_df = tune_val_df.copy()
+                base_df["pred"] = pred
+
+                scored_df = self._apply_signals(
+                    base_df,
+                    pred=None,
+                    max_top_tickers=self.config.max_top_tickers,
+                    allow_short=self.config.allow_short,
+                )
+
+                row_metrics = self.evaluate_strategy(scored_df)
+                portfolio_metrics = self.evaluate_rotating_portfolio(
+                    base_df,
+                    max_top_tickers=self.config.max_top_tickers,
+                    allow_short=self.config.allow_short,
+                )
+
+                score = portfolio_metrics["portfolio_sharpe_like"]
+
+                result = {
+                    "trial": i,
+                    "score": float(score),
+                    "mae": float(mean_absolute_error(y_tune_val, pred)),
+                    "rmse": float(mean_squared_error(y_tune_val, pred) ** 0.5),
+                    "rank_ic_mean": row_metrics["rank_ic_mean"],
+                    "hit_rate": row_metrics["hit_rate"],
+                    "median_return": row_metrics["median_return"],
+                    "portfolio": portfolio_metrics,
+                    "params": sampled_params,
+                }
+
+                log(json.dumps(result, indent=4))
+
+                if score > best_score:
+                    best_score = score
+                    best_params = sampled_params
+                    best_result = result
+
+            except Exception as e:
+                log(f"LGBM tuning trial {i} failed: {e}")
+
+            flush_memory()
+
+        if best_params is None:
+            log("LightGBM tuning failed. Falling back to default params.")
+            return {}
+
+        log("Best LightGBM tuning result:")
+        log(json.dumps(best_result, indent=4))
+
+        return best_params
+
+    def tune_catboost(self, n_trials: int = 10) -> dict:
+        log(f"Tuning CatBoost with {n_trials} trials...")
+
+        X_tune_train, y_tune_train, X_tune_val, y_tune_val, tune_val_df = self._make_tuning_split()
+
+        param_space = {
+            "iterations": [300, 500, 700],
+            "learning_rate": [0.01, 0.02, 0.025, 0.035, 0.05],
+            "depth": [4, 5, 6, 7],
+            "l2_leaf_reg": [1.0, 3.0, 5.0, 10.0],
+            "random_strength": [0.0, 0.5, 1.0, 2.0],
+            "bagging_temperature": [0.0, 0.5, 1.0, 2.0],
+            "border_count": [64, 128, 254],
+        }
+
+        sampler = list(ParameterSampler(param_space, n_iter=n_trials, random_state=self.seed))
+
+        best_score = -np.inf
+        best_params = None
+        best_result = None
+
+        for i, sampled_params in enumerate(sampler, start=1):
+            params = self._get_cat_params({"CAT": {"best_params": sampled_params}})
+            model = CatBoostRegressor(random_seed=self.seed, verbose=False, **params)
+
+            try:
+                model.fit(X_tune_train, y_tune_train)
+                pred = model.predict(X_tune_val)
+
+                base_df = tune_val_df.copy()
+                base_df["pred"] = pred
+
+                scored_df = self._apply_signals(
+                    base_df,
+                    pred=None,
+                    max_top_tickers=self.config.max_top_tickers,
+                    allow_short=self.config.allow_short,
+                )
+
+                row_metrics = self.evaluate_strategy(scored_df)
+                portfolio_metrics = self.evaluate_rotating_portfolio(
+                    base_df,
+                    max_top_tickers=self.config.max_top_tickers,
+                    allow_short=self.config.allow_short,
+                )
+
+                score = portfolio_metrics["portfolio_sharpe_like"]
+
+                result = {
+                    "trial": i,
+                    "score": float(score),
+                    "mae": float(mean_absolute_error(y_tune_val, pred)),
+                    "rmse": float(mean_squared_error(y_tune_val, pred) ** 0.5),
+                    "rank_ic_mean": row_metrics["rank_ic_mean"],
+                    "hit_rate": row_metrics["hit_rate"],
+                    "median_return": row_metrics["median_return"],
+                    "portfolio": portfolio_metrics,
+                    "params": sampled_params,
+                }
+
+                log(json.dumps(result, indent=4))
+
+                if score > best_score:
+                    best_score = score
+                    best_params = sampled_params
+                    best_result = result
+
+            except Exception as e:
+                log(f"CatBoost tuning trial {i} failed: {e}")
+
+            del model
+            flush_memory()
+
+        if best_params is None:
+            log("CatBoost tuning failed. Falling back to default params.")
+            return {}
+
+        log("Best CatBoost tuning result:")
+        log(json.dumps(best_result, indent=4))
+
+        return best_params
+
+    def run_tuning_pipeline(self, interval, status_signal: tuple | None = None, force_train: bool = True) -> bool:
+        def log_update(msg, force_log=False):
+            if status_signal:
+                u_queue, core_key = status_signal
+                u_queue.put((core_key, {"Current Task": msg}))
+                if force_log:
+                    log(msg)
+            elif Settings.LOGGING or force_log:
+                log(msg)
+
+        if interval == "1d":
+            self.config.horizon = 40
+            self.config.max_top_tickers = 30
+        elif interval == "1h":
+            self.config.horizon = 30
+            self.config.max_top_tickers = 10
+
+        log_update("Building universe dataframe...", True)
+        data = self._build_universe_frame(interval)
+
+        log_update("Preparing pooled features...", True)
+        self._prepare_data(data)
+
+        best_lgbm_params = self.tune_lightgbm(n_trials=5)
+        with open(f"lgbm_params_{interval}.json", "w") as f:
+            json.dump(best_lgbm_params, f)
+
+        best_cat_params = self.tune_catboost(n_trials=5)
+        with open(f"cat_params_{interval}.json", "w") as f:
+            json.dump(best_cat_params, f)
+
+        return True
+
+    ####################################
+
 
     @staticmethod
     def add_forward_excess_target(df: pd.DataFrame, benchmark_close: pd.Series, horizon: int, beta: float = 1.0) -> pd.DataFrame:
@@ -781,9 +998,6 @@ if __name__ in "__main__":
 
     print("Training...")
     manager = TrainingManager()
-    success = manager.run_training_pipeline("1h", force_train=True)
-    # log(success)
-    # log("Predicting...")
-    # run_prediction_pipeline("AAPL", "1d")
+    success = manager.run_tuning_pipeline("1d", force_train=True)
 
     print(time.perf_counter() - start)
