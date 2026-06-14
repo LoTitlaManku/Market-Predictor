@@ -560,10 +560,10 @@ if __name__ in "__main__":
     import time
     start = time.perf_counter()
 
-    # from predictor import TrainingManager, Settings, run_prediction_pipeline
-    # print("Training...")
-    # success = TrainingManager().run_training_pipeline("AAPL", "1d")
-    # print(success)
+    from predictor import TrainingManager
+    print("Training...")
+    success = TrainingManager().run_training_pipeline("AAPL", "1d")
+    print(success)
     # print("Predicting...")
     # run_prediction_pipeline("AAPL", "1d")
 

@@ -27,11 +27,11 @@ NYSE_CAL = mcal.get_calendar('NYSE')
 
 # Custom imports
 from scripts.config import DATA_DIR, HYPER_DIR
-import scripts.indicators_tuning # noqa
+import scripts.indicators # noqa
 
 class Settings:
     VERBOSE = 0
-    GPU = {"LGBM": False, "CAT": True, "LSTM": True}
+    GPU = {"LGBM": True, "CAT": True, "LSTM": True}
 
 def flush_memory():
     gc.collect()
@@ -293,7 +293,7 @@ class TrainingManager:
                 'class_weight': class_weight,
                 'verbose': -1,
                 'n_jobs': -1,
-                'device_type': 'cuda' if Settings.GPU["LGBM"] else "cpu"
+                'device_type': 'gpu' if Settings.GPU["LGBM"] else "cpu"
             }
 
             model = LGBMClassifier(**params)

@@ -1,5 +1,12 @@
 
 
-add CatBoost model type
 
-refind the best hyperparameters
+cd ~/Market-Predictor
+
+nohup uv run -m scripts.hyperparameter_tuning > training.log 2>&1 &
+
+ps aux | grep hyperparameter_tuning
+
+cat training.log
+
+cat 'results/tuned_Profile A_1h.json'
