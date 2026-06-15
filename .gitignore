@@ -6,10 +6,8 @@
 
 # Local storage
 cache_files/
-models/
 ledgers*/
 .bin/
-plots/
 scripts/catboost_info/
 
 # UV and others

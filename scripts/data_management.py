@@ -15,7 +15,7 @@ from yfinance import shared
 from tqdm import tqdm
 
 # Custom imports
-from scripts.config import CACHE_DIR, LEDGER_DIR, DATA_DIR
+from scripts.config import CACHE_DIR, DATA_DIR
 
 NYSE_CAL = mcal.get_calendar('NYSE')
 
