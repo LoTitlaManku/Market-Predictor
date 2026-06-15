@@ -1,0 +1,21 @@
+{
+    "interval": "1d",
+    "model_type": "ENSEMBLE",
+    "months_back": 3,
+    "cutoff_date": "2026-02-08",
+    "start_date": "2026-02-09",
+    "end_date": "2026-05-07",
+    "initial_capital": 1000.0,
+    "final_equity": 1268.519800291179,
+    "profit_loss": 268.5198002911791,
+    "total_return": 0.26851980029117906,
+    "cagr_like": 1.6293799124319102,
+    "sharpe_like": 2.0989007893095133,
+    "max_drawdown": -0.20055776151548732,
+    "win_rate": 0.5,
+    "mean_daily_return": 0.004377745851925059,
+    "median_daily_return": 0.000559041367774543,
+    "avg_holdings": 10.758064516129032,
+    "avg_turnover": 1.032258064516129,
+    "trade_count": 64
+}
