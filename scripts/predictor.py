@@ -426,7 +426,7 @@ class TrainingManager:
 
         if self.config.min_profile_adv > 0 and np.isfinite(adv):
             if float(adv) < self.config.min_profile_adv:
-                log(f"Skipping {ticker}: profile ADV too low ({adv:,.0f})", False)
+                # log(f"Skipping {ticker}: profile ADV too low ({adv:,.0f})", False)
                 return False
 
         return True
@@ -477,11 +477,12 @@ class TrainingManager:
         min_rows = self._min_rows_after_filter(interval)
 
         if after < min_rows:
-            log(f"Skipping {ticker}: too few rows after liquidity filter ({after}/{before})", False)
+            # log(f"Skipping {ticker}: too few rows after liquidity filter ({after}/{before})", False)
             return pd.DataFrame()
 
         if after < before:
-            log(f"{ticker}: liquidity filter kept {after:,}/{before:,} rows", False)
+            # log(f"{ticker}: liquidity filter kept {after:,}/{before:,} rows", False)
+            pass
 
         return df
 
@@ -756,7 +757,7 @@ class TrainingManager:
 
         return df
 
-    def _build_universe_frame(self, interval: str, drop_unlabelled: bool = True) -> pd.DataFrame:
+    def _build_universe_frame(self, interval: str, drop_unlabelled: bool = True, cutoff_date: pd.Timestamp | None = None) -> pd.DataFrame:
         with open(os.path.join(DATA_DIR, "ticker_attr.json"), "r") as f:
             ticker_map = json.load(f)
 
@@ -773,8 +774,11 @@ class TrainingManager:
             try:
                 raw = load_data(ticker, interval)
                 if raw is None or raw.empty:
-                    log(f"Skipping {ticker}: no data")
+                    # log(f"Skipping {ticker}: no data")
                     continue
+
+                if cutoff_date is not None:
+                    raw = raw.loc[:pd.Timestamp(cutoff_date)].copy()
 
                 meta = ticker_map.get(ticker, {})
                 if not self._passes_static_liquidity_filter(ticker, meta): continue
@@ -800,7 +804,8 @@ class TrainingManager:
                 frames.append(df)
 
             except Exception as e:
-                log(f"Skipping {ticker}: {e}")
+                # log(f"Skipping {ticker}: {e}")
+                pass
 
         if not frames:
             raise ValueError("No usable universe data")
@@ -1547,9 +1552,27 @@ def all_model_assets_exist(model_path: str | os.PathLike) -> bool:
 
 ########################################################################################################################
 
-def prepare_manager_with_cutoff(manager: TrainingManager, data: pd.DataFrame, cutoff_date) -> pd.DataFrame:
-    data = data.copy()
-    data["Date"] = pd.to_datetime(data["Date"])
+def prepare_manager_with_cutoff(manager: TrainingManager, train_data: pd.DataFrame, full_data: pd.DataFrame, cutoff_date) -> pd.DataFrame:
+    cutoff_date = pd.Timestamp(cutoff_date)
+
+    train_data = train_data.copy()
+    full_data = full_data.copy()
+
+    train_data["Date"] = pd.to_datetime(train_data["Date"])
+    full_data["Date"] = pd.to_datetime(full_data["Date"])
+
+    walk_data = full_data[full_data["Date"] > cutoff_date].copy()
+
+    if train_data.empty:
+        raise ValueError("No training rows before cutoff date.")
+
+    if walk_data.empty:
+        raise ValueError("No walk-forward rows after cutoff date.")
+
+    # Combine only safe train rows + after-cutoff walk rows.
+    # This lets dummy columns / feature columns match cleanly.
+    data = pd.concat([train_data, walk_data], axis=0, ignore_index=True)
+
     data["profile_group"] = data["profile"]
 
     rank_pct = data.groupby("Date")["profile_vol"].rank(method="first", pct=True)
@@ -1588,9 +1611,6 @@ def prepare_manager_with_cutoff(manager: TrainingManager, data: pd.DataFrame, cu
         if c not in drop_cols and pd.api.types.is_numeric_dtype(data[c])
     ]
 
-    cutoff_date = pd.Timestamp(cutoff_date)
-    manager.split_date = cutoff_date
-
     train_df = data[
         (data["Date"] <= cutoff_date)
         & data["target_excess_return"].notna()
@@ -1599,11 +1619,12 @@ def prepare_manager_with_cutoff(manager: TrainingManager, data: pd.DataFrame, cu
     walk_df = data[data["Date"] > cutoff_date].copy()
 
     if train_df.empty:
-        raise ValueError("No training rows before cutoff date.")
+        raise ValueError("No labelled training rows before cutoff date.")
 
     if walk_df.empty:
         raise ValueError("No walk-forward rows after cutoff date.")
 
+    manager.split_date = cutoff_date
     manager.train_df = train_df
     manager.test_df = walk_df
 
@@ -1689,7 +1710,67 @@ def save_walk_forward_results(interval: str, model_type: str, months_back: int, 
 
     return folder
 
-def run_walk_forward_backtest(interval: str, model_type: str, months_back: int = 3, initial_capital: float = 1000.0) -> dict[str, Any]:
+def add_consensus_ensemble_predictions(df: pd.DataFrame, top_n_per_model: int = 50, cat_weight: float = 0.6, lgbm_weight: float = 0.4) -> pd.DataFrame:
+    df = df.copy()
+
+    required_cols = {"Date", "ticker", "pred_cat", "pred_lgbm"}
+    missing = required_cols - set(df.columns)
+
+    if missing:
+        raise ValueError(f"Missing columns for ensemble: {missing}")
+
+    df["cat_rank_pct"] = df.groupby("Date")["pred_cat"].rank(
+        method="first",
+        pct=True,
+    )
+
+    df["lgbm_rank_pct"] = df.groupby("Date")["pred_lgbm"].rank(
+        method="first",
+        pct=True,
+    )
+
+    df["pred"] = 0.0
+    df["ensemble_agreement"] = 0
+    df["ensemble_score"] = 0.0
+
+    for date, group in df.groupby("Date"):
+        cat_top = set(
+            group.nlargest(
+                min(top_n_per_model, len(group)),
+                "pred_cat",
+            )["ticker"]
+        )
+
+        lgbm_top = set(
+            group.nlargest(
+                min(top_n_per_model, len(group)),
+                "pred_lgbm",
+            )["ticker"]
+        )
+
+        consensus = cat_top & lgbm_top
+
+        if not consensus:
+            continue
+
+        idx = group[group["ticker"].isin(consensus)].index
+
+        score = (
+                cat_weight * df.loc[idx, "cat_rank_pct"]
+                + lgbm_weight * df.loc[idx, "lgbm_rank_pct"]
+        )
+
+        df.loc[idx, "ensemble_agreement"] = 1
+        df.loc[idx, "ensemble_score"] = score
+        df.loc[idx, "pred"] = score
+
+    # Force the signal system to rank all consensus tickers against each other
+    # rather than splitting them by volatility bucket.
+    df["profile_group"] = "ensemble"
+
+    return df
+
+def run_walk_forward_backtest(interval: str, months_back: int = 3, initial_capital: float = 1000.0) -> dict[str, Any]:
     manager = TrainingManager()
 
     if interval == "1d":
@@ -1701,40 +1782,70 @@ def run_walk_forward_backtest(interval: str, model_type: str, months_back: int =
     else:
         raise ValueError(f"Unsupported interval: {interval}")
 
-    model_type = model_type.upper()
+    model_type = "ENSEMBLE"
 
     log("=" * 50)
     log(f"WALK-FORWARD BACKTEST: {model_type} {interval}")
     log("=" * 50)
 
-    log("Building universe dataframe for walk-forward...")
-    data = manager._build_universe_frame(
-        interval,
-        drop_unlabelled=False,
-    )
+    spy_df = pd.read_parquet(os.path.join(DATA_DIR, f"SPY_{interval}.parquet"))
+    spy_df.index.name = "Date"
+    spy_df.index = pd.to_datetime(spy_df.index, utc=True).tz_localize(None)
 
-    latest_date = pd.Timestamp(data["Date"].max())
+    latest_date = pd.Timestamp(spy_df.index.max())
     cutoff_date = latest_date - pd.DateOffset(months=months_back)
 
     log(f"Latest available date: {latest_date.strftime('%Y-%m-%d')}")
     log(f"Cutoff date: {cutoff_date.strftime('%Y-%m-%d')}")
 
-    walk_df = prepare_manager_with_cutoff(
-        manager=manager,
-        data=data,
+    log("Building training universe up to cutoff...")
+    train_data = manager._build_universe_frame(
+        interval,
+        drop_unlabelled=True,
         cutoff_date=cutoff_date,
     )
 
-    log(f"Training {model_type} up to cutoff...")
-    model = fit_walk_forward_model(
-        manager=manager,
-        interval=interval,
-        model_type=model_type,
+    log("Building full universe for walk-forward predictions...")
+    full_data = manager._build_universe_frame(
+        interval,
+        drop_unlabelled=False,
+        cutoff_date=None,
     )
 
+    walk_df = prepare_manager_with_cutoff(
+        manager=manager,
+        train_data=train_data,
+        full_data=full_data,
+        cutoff_date=cutoff_date,
+    )
+
+    manager.config.max_top_tickers = 20
     X_walk = walk_df[manager.feature_cols].to_numpy(dtype=np.float32)
     walk_df = walk_df.copy()
-    walk_df["pred"] = model.predict(X_walk)
+
+    log("Training CAT up to cutoff...")
+    cat_model = fit_walk_forward_model(
+        manager=manager,
+        interval=interval,
+        model_type="CAT",
+    )
+
+    log("Training LGBM up to cutoff...")
+    lgbm_model = fit_walk_forward_model(
+        manager=manager,
+        interval=interval,
+        model_type="LGBM",
+    )
+
+    walk_df["pred_cat"] = cat_model.predict(X_walk)
+    walk_df["pred_lgbm"] = lgbm_model.predict(X_walk)
+
+    walk_df = add_consensus_ensemble_predictions(
+        walk_df,
+        top_n_per_model=50,
+        cat_weight=0.6,
+        lgbm_weight=0.4,
+    )
 
     walk_df = walk_df.sort_values(["ticker", "Date"])
     walk_df["next_return"] = (
@@ -1978,14 +2089,14 @@ if __name__ == "__main__":
     start = time.perf_counter()
 
     print("Training...")
-    mng = TrainingManager()
-    mng.run_training_pipeline("1d")
+    # mng = TrainingManager()
+    # mng.run_training_pipeline("1d")
 
-    run_walk_forward_backtest(
-        interval="1d",
-        model_type="CAT",
-        months_back=3,
-        initial_capital=1000.0,
-    )
+    for m in [3,6,12]:
+        run_walk_forward_backtest(
+            interval="1d",
+            months_back=m,
+            initial_capital=1000.0,
+        )
 
     print(f"Total time: {time.perf_counter() - start:.1f}s")

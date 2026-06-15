@@ -1,0 +1,21 @@
+{
+    "interval": "1d",
+    "model_type": "CAT",
+    "months_back": 12,
+    "cutoff_date": "2025-05-08",
+    "start_date": "2025-05-09",
+    "end_date": "2026-05-07",
+    "initial_capital": 1000.0,
+    "final_equity": 2937.5759194567513,
+    "profit_loss": 1937.5759194567513,
+    "total_return": 1.9375759194567514,
+    "cagr_like": 1.963009283860322,
+    "sharpe_like": 4.483515107020814,
+    "max_drawdown": -0.09966928220872229,
+    "win_rate": 0.58,
+    "mean_daily_return": 0.00444205335563929,
+    "median_daily_return": 0.0028804217533372365,
+    "avg_holdings": 14.82,
+    "avg_turnover": 1.664,
+    "trade_count": 416
+}
