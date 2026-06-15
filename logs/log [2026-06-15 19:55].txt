@@ -1,0 +1,50 @@
+==================================================
+WALK-FORWARD BACKTEST: ENSEMBLE 1d
+==================================================
+Loading all tickers...
+Latest available date: 2026-06-12
+Cutoff date: 2026-03-12
+Building training universe up to cutoff...
+Building full universe for walk-forward predictions...
+Walk-forward cutoff date: 2026-03-12
+Train rows: 888,062
+Walk-forward rows: 14,557
+Features: 66
+Training CAT up to cutoff...
+Training LGBM up to cutoff...
+Saved walk-forward results to: /home/god/Projects/market_predictor/models/1d Model [2026-06-15 19:55]/walk_forward/ENSEMBLE_3m
+Walk-forward summary:
+{
+    "interval": "1d",
+    "model_type": "ENSEMBLE",
+    "months_back": 3,
+    "cutoff_date": "2026-03-12",
+    "start_date": "2026-03-13",
+    "end_date": "2026-06-10",
+    "initial_capital": 1000.0,
+    "final_equity": 1359.6281353397794,
+    "profit_loss": 359.6281353397794,
+    "total_return": 0.35962813533977944,
+    "cagr_like": 2.4856864911496945,
+    "sharpe_like": 2.251528014063518,
+    "max_drawdown": -0.20155966371127987,
+    "win_rate": 0.5161290322580645,
+    "mean_daily_return": 0.005769039493521553,
+    "median_daily_return": 0.003317239127563493,
+    "avg_holdings": 9.14516129032258,
+    "avg_turnover": 1.0161290322580645,
+    "trade_count": 63,
+    "attribution_concentration": {
+        "total_positive_pnl": 467.65820023376887,
+        "top_1_pnl": 123.83562620368991,
+        "top_3_pnl": 264.9700026945548,
+        "top_5_pnl": 335.3337979117007,
+        "top_1_share_of_positive_pnl": 0.2647994328802276,
+        "top_3_share_of_positive_pnl": 0.5665890228421183,
+        "top_5_share_of_positive_pnl": 0.7170488996965668
+    }
+}
+==================================================
+WALK-FORWARD BACKTEST: ENSEMBLE 1d
+==================================================
+Loading all tickers...

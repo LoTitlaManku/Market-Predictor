@@ -2,11 +2,9 @@
 import gc
 import json
 import os
-import shutil
 import time
 import warnings
 from dataclasses import asdict, dataclass
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 from tqdm import tqdm
@@ -17,7 +15,7 @@ import pandas as pd
 import torch
 from catboost import CatBoostRegressor
 from lightgbm import LGBMRegressor
-from sklearn.metrics import mean_absolute_error, mean_squared_error
+# from sklearn.metrics import mean_absolute_error, mean_squared_error
 
 from scripts.config import DATA_DIR, MODEL_DIR, ROOT_DIR, LOG_DIR
 from scripts.data_management import load_data
@@ -67,7 +65,7 @@ def flush_memory():
     gc.collect()
     if torch.cuda.is_available(): torch.cuda.empty_cache()
 
-now = datetime.now().strftime('%Y-%m-%d %H:%M')
+now = pd.Timestamp.now().strftime('%Y-%m-%d %H:%M')
 def log(string: str, prints: bool = True):
     if prints: print(string)
     with open(os.path.join(LOG_DIR, f"log [{now}].txt"), "a") as f: f.write(f"{string}\n")
@@ -76,7 +74,7 @@ def json_safe(value):
     if isinstance(value, dict):                              return {str(k): json_safe(v) for k, v in value.items()}
     if isinstance(value, (list, tuple)):                     return [json_safe(v) for v in value]
     if isinstance(value, np.ndarray):                        return value.tolist()
-    if isinstance(value, (pd.Timestamp, datetime)):          return value.isoformat()
+    if isinstance(value, pd.Timestamp):                      return value.isoformat()
     if isinstance(value, Path):                              return str(value)
     if isinstance(value, np.generic):                        value = value.item()
     if isinstance(value, float) and not np.isfinite(value):  return None
@@ -103,7 +101,8 @@ class TrainingManager:
 
     ######################     Creating universe dataframe     ######################
 
-    def _add_liquidity_columns(self, df: pd.DataFrame, interval: str) -> pd.DataFrame:
+    @staticmethod
+    def _add_liquidity_columns(df: pd.DataFrame, interval: str) -> pd.DataFrame:
         df = df.copy()
 
         price_col = "Adj Close" if "Adj Close" in df.columns else "Close"
@@ -181,16 +180,39 @@ class TrainingManager:
             beta_used = beta.reindex(df.index).ffill()
             beta_used = beta_used.replace([np.inf, -np.inf], np.nan).fillna(1.0)
         else:
-            beta_used = 1.0 if not np.isfinite(beta) else float(beta)
+            beta_used = 1.0 if not np.isfinite(beta) else beta
 
         df["target_beta_used"] = beta_used
         df["target_excess_return"] = (df["future_return"] - beta_used * df["benchmark_future_return"])
 
         return df.dropna(subset=["target_excess_return"]) if drop_unlabelled else df
 
-    def build_universe_frame(self, interval: str, drop_unlabelled: bool = True, cutoff_date: pd.Timestamp | None = None) -> pd.DataFrame:
+    @staticmethod
+    def load_raw_data(interval: str) -> dict[str, pd.DataFrame]:
         with open(os.path.join(DATA_DIR, "ticker_attr.json"), "r") as f: ticker_map = json.load(f)
         ticker_list = sorted(set(ticker_map.keys()))
+        data_dict: dict[str, pd.DataFrame] = {}
+
+        log("")
+        for ticker in tqdm(ticker_list, desc="Loading raw ticker data"):
+            try:
+                data = load_data(ticker, interval)
+                if data is None or data.empty: continue
+
+                data.index = pd.to_datetime(data.index, utc=True).tz_localize(None)
+                data = data[~data.index.duplicated(keep="first")].sort_index()
+
+                data_dict[ticker] = data
+
+            except Exception as e:
+                log(f"Skipping raw load {ticker}: {type(e).__name__}: {e}", prints=False)
+
+        log("")
+        if not data_dict: raise ValueError("No raw universe data loaded.")
+        return data_dict
+
+    def build_universe(self, interval: str, data_dict: dict, drop_unlabelled: bool = True, cutoff_date: pd.Timestamp | None = None) -> pd.DataFrame:
+        with open(os.path.join(DATA_DIR, "ticker_attr.json"), "r") as f: ticker_map = json.load(f)
 
         benchmark_raw = pd.read_parquet(os.path.join(DATA_DIR, f"SPY_{interval}.parquet"))
         benchmark_raw.index.name = "Date"
@@ -198,24 +220,23 @@ class TrainingManager:
         benchmark_raw = benchmark_raw[~benchmark_raw.index.duplicated(keep="first")].sort_index()
         benchmark_close = benchmark_raw["Adj Close"]
 
-        frames = []
-        for ticker in tqdm(ticker_list):
+        log("")
+        frames: list[pd.DataFrame] = []
+        for ticker, data in tqdm(data_dict.items()):
             try:
-                raw = load_data(ticker, interval)
-                if raw is None or raw.empty: continue
-
-                if cutoff_date is not None: raw = raw.loc[:pd.Timestamp(cutoff_date)].copy()
+                data = data.copy()
+                if cutoff_date is not None: data = data.loc[:pd.Timestamp(cutoff_date)].copy()
 
                 adv = ticker_map.get(ticker, {}).get("adv", np.nan)
                 if self.config.min_profile_adv > max(0, float(adv)) and np.isfinite(adv): continue
 
-                df = raw.ind.add_indicators(ticker, interval, add_targets=False)
+                df = data.ind.add_indicators(ticker, interval, add_targets=False)
 
                 df = self._add_liquidity_columns(df, interval)
-                df = self._apply_liquidity_filters(df, interval)
-
                 df = self._add_rolling_risk_columns(df, benchmark_close, interval)
+
                 df = self.add_forward_excess_target(df, benchmark_close, df["rolling_beta"], drop_unlabelled)
+                df = self._apply_liquidity_filters(df, interval)
 
                 if df.empty: continue
 
@@ -224,11 +245,13 @@ class TrainingManager:
                 df = df.reset_index(drop=True)
                 frames.append(df)
 
-            except Exception: pass # noqa
+            except Exception as e:
+                log(f"Skipping {ticker}: {type(e).__name__}: {e}", prints=False)
+                pass
 
         if not frames: raise ValueError("No usable universe data")
 
-        data = pd.concat(frames, axis=0, ignore_index=True)
+        data: pd.DataFrame = pd.concat(frames, axis=0, ignore_index=True)
         data = data.sort_values(["Date", "ticker"])
         data = data.replace([np.inf, -np.inf], np.nan)
 
@@ -238,9 +261,10 @@ class TrainingManager:
             non_target_cols = [c for c in data.columns if c not in target_cols]
             data = data.dropna(subset=non_target_cols)
 
+        log("")
         return data
 
-    def _prepare_data(self, data: pd.DataFrame) -> None:
+    def _prepare_data(self, data: pd.DataFrame, train: bool = True) -> pd.DataFrame:
         data = data.copy()
         rank_pct = data.groupby("Date")["rolling_vol"].rank(method="first", pct=True)
 
@@ -264,24 +288,31 @@ class TrainingManager:
             "dollar_volume", "rolling_dollar_volume", "abs_bar_return", "target_beta_used"
         }
 
-        self.feature_cols = [c for c in data.columns if c not in drop_cols and pd.api.types.is_numeric_dtype(data[c])]
+        if train:
+            data = data[data["target_excess_return"].notna()].copy()
+            self.feature_cols = [c for c in data.columns if c not in drop_cols and pd.api.types.is_numeric_dtype(data[c])]
+            self.split_date = data["Date"].max()
 
-        unique_dates = np.array(sorted(pd.to_datetime(data["Date"]).unique()))
-        self.split_date = unique_dates[int(len(unique_dates) * (1 - self.__test_size))]
+            self.train_df = data.copy()
+            self.test_df = None
 
-        self.train_df = data[data["Date"] <= self.split_date].copy()
-        self.test_df = data[data["Date"] > self.split_date].copy()
+            self.X_train = self.train_df[self.feature_cols].to_numpy(dtype=np.float32)
+            self.y_train = self.train_df["target_excess_return"].to_numpy(dtype=np.float32) # noqa
 
-        self.X_train = self.train_df[self.feature_cols].to_numpy(dtype=np.float32)
-        self.X_test = self.test_df[self.feature_cols].to_numpy(dtype=np.float32)
+            self.X_test = None
+            self.y_test = None
 
-        self.y_train = self.train_df["target_excess_return"].to_numpy(dtype=np.float32)
-        self.y_test = self.test_df["target_excess_return"].to_numpy(dtype=np.float32)
+            log(f"Full training rows: {len(self.train_df):,}")
+            log(f"Features: {len(self.feature_cols)}")
+            log(f"Latest labelled date: {pd.Timestamp(self.split_date).strftime('%Y-%m-%d')}") # noqa
 
-        log(f"Features: {len(self.feature_cols)}")
-        log(f"Train rows: {len(self.train_df):,}")
-        log(f"Test rows: {len(self.test_df):,}")
-        log(f"Split date: {pd.Timestamp(self.split_date).strftime('%Y-%m-%d')}")
+        else:
+            if self.feature_cols is None: raise ValueError("feature_cols is not set.")
+            for col in self.feature_cols:
+                if col not in data.columns:
+                    data[col] = 0
+
+        return data
 
     ######################           Other functions           ######################
 
@@ -308,143 +339,143 @@ class TrainingManager:
 
         return df
 
-    def _train_lightgbm(self, interval: str) -> dict:
-        params_path = Path(ROOT_DIR) / "results" / f"lgbm_params_{interval}.json"
+    def _train_model(self, interval: str, model_type: str):
+        params_path = Path(ROOT_DIR) / "results" / f"{model_type.lower()}_params_{interval}.json"
         params = json.loads(params_path.read_text()) if params_path.exists() else {}
 
-        if Settings.GPU["LGBM"]: params.update({"device_type": "gpu", "gpu_platform_id": 0, "gpu_device_id": 0})
-        if Settings.Threaded: params.update({"num_threads": -1, "n_jobs": -1})
-        params.update({"objective": "regression"})
+        if model_type == "CAT":
+            if Settings.Threaded: params.update({"thread_count": -1})
+            params.update({
+                "loss_function": "RMSE",
+                "allow_writing_files": False,
+                "task_type": "GPU" if Settings.GPU["CAT"] else "CPU",
+            })
 
-        model = LGBMRegressor(random_state=self.seed, verbose=-1, **params)
+            model = CatBoostRegressor(random_seed=self.seed, verbose=False, **params)
+
+        elif model_type == "LGBM":
+            if Settings.GPU["LGBM"]: params.update({"device_type": "gpu", "gpu_platform_id": 0, "gpu_device_id": 0})
+            if Settings.Threaded: params.update({"num_threads": -1, "n_jobs": -1})
+            params.update({"objective": "regression"})
+
+            model = LGBMRegressor(random_state=self.seed, verbose=-1, **params)
+
+        else: raise ValueError(f"Unknown model type: {model_type}")
+
         model.fit(self.X_train, self.y_train)
+        return model
 
-        pred = model.predict(self.X_test)
+    def save_training_run(self, interval: str, results: dict):
+        local_now = pd.Timestamp.now().strftime('%Y-%m-%d %H:%M')
+        save_folder = Path(MODEL_DIR) / f"{interval} Models"
 
-        base_df = self.test_df.copy()
-        base_df["pred"] = pred
-        scored_df = self.add_cross_sectional_signals(base_df)
-
-        return {
-            "type": "LGBM",
-            "model": model,
-            "test_df": scored_df,
-            "base_df": base_df,
-            "mae": mean_absolute_error(self.y_test, pred),
-            "rmse": float(mean_squared_error(self.y_test, pred) ** 0.5),
-        }
-
-    def _train_catboost(self, interval: str) -> dict:
-        params_path = Path(ROOT_DIR) / "results" / f"cat_params_{interval}.json"
-        params = json.loads(params_path.read_text()) if params_path.exists() else {}
-
-        if Settings.Threaded: params.update({"thread_count": -1})
-        params.update({
-            "loss_function": "RMSE",
-            "allow_writing_files": False,
-            "task_type": "GPU" if Settings.GPU["CAT"] else "CPU",
-        })
-
-        model = CatBoostRegressor(random_seed=self.seed, verbose=False, **params)
-        model.fit(self.X_train, self.y_train)
-
-        pred = model.predict(self.X_test)
-
-        base_df = self.test_df.copy()
-        base_df["pred"] = pred
-        scored_df = self.add_cross_sectional_signals(base_df)
-
-        return {
-            "type": "CAT",
-            "model": model,
-            "test_df": scored_df,
-            "base_df": base_df,
-            "mae": mean_absolute_error(self.y_test, pred),
-            "rmse": float(mean_squared_error(self.y_test, pred) ** 0.5),
-        }
-
-    def latest_prediction_export(self, scored_df: pd.DataFrame, include_actuals: bool = False) -> pd.DataFrame:
-        latest_date = scored_df["Date"].max()
-        latest = scored_df[scored_df["Date"] == latest_date].copy()
-        latest = latest.sort_values("pred", ascending=False)
-
-        cols = ["Date", "ticker", "profile_group", "pred", "pred_signal"]
-        if include_actuals:
-            cols += ["target_excess_return", "future_return", "benchmark_future_return"]
-
-        cols = [c for c in cols if c in latest.columns]
-
-        top = latest.head(min(self.config.max_top_tickers, len(latest)))
-        bottom = latest.tail(min(self.config.max_top_tickers, len(latest)))
-
-        if len(latest) <= self.config.max_top_tickers * 2: return latest[cols]
-        return pd.concat([top, bottom], axis=0)[cols]
-
-    def save_training_run(self, interval: str, results: dict) -> Path:
-        global now
-        save_folder = Path(MODEL_DIR) / f"{interval} Model [{now}]"
-        save_folder.mkdir(parents=True, exist_ok=True)
-
-        models_folder = save_folder / "models"
+        model_folder = save_folder / "models" / f"{local_now}"
         predictions_folder = save_folder / "predictions"
-        reports_folder = save_folder / "reports"
 
-        models_folder.mkdir(parents=True, exist_ok=True)
+        model_folder.mkdir(parents=True, exist_ok=True)
         predictions_folder.mkdir(parents=True, exist_ok=True)
-        reports_folder.mkdir(parents=True, exist_ok=True)
 
         metadata = {
-            "training_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "training_date": local_now,
             "interval": interval,
             "config": asdict(self.config),
-            "split_date": pd.Timestamp(self.split_date).strftime("%Y-%m-%d"),
+            "end_date": pd.Timestamp(self.split_date).strftime("%Y-%m-%d"),
             "feature_count": len(self.feature_cols),
             "feature_cols": list(self.feature_cols),
-            "model_results": {},
         }
 
-        for model_type, model_results in results.items():
-            metadata["model_results"][model_type] = {
-                k: json_safe(v)
-                for k, v in model_results.items()
-                if k not in {"model", "test_df", "base_df"}
-            }
-
-            model = model_results["model"]
-
+        for model_type, model in results.items():
             if model_type == "LGBM":
-                model.booster_.save_model(str(models_folder / "lgbm_model.txt"))
-                joblib.dump(model, models_folder / "lgbm_model.joblib")
+                model.booster_.save_model(str(model_folder / "lgbm_model.txt"))
+                joblib.dump(model, model_folder / "lgbm_model.joblib")
             elif model_type == "CAT":
-                joblib.dump(model, models_folder / "cat_model.joblib")
+                joblib.dump(model, model_folder / "cat_model.joblib")
             else:
-                joblib.dump(model, models_folder / f"{model_type}_model.joblib")
-
-            if "test_df" in model_results:
-                test_df = model_results["test_df"]
-                test_df.to_parquet(predictions_folder / f"{model_type}_test_predictions.parquet", index=False)
-
-                latest_live = self.latest_prediction_export(test_df, False)
-                latest_debug = self.latest_prediction_export(test_df, True)
-
-                latest_live.to_csv(predictions_folder / f"{model_type}_latest_live_predictions.csv", index=False)
-                latest_debug.to_csv(predictions_folder / f"{model_type}_latest_debug_predictions.csv", index=False)
-
-            if "base_df" in model_results:
-                model_results["base_df"].to_parquet(predictions_folder / f"{model_type}_base_predictions.parquet", index=False)
-
-            summary_path = reports_folder / f"{model_type}_summary.json"
-            summary_path.write_text(json.dumps(metadata["model_results"][model_type], indent=4), encoding="utf-8")
+                joblib.dump(model, model_folder / f"{model_type}_model.joblib")
 
         joblib.dump(self.feature_cols, save_folder / "features.joblib")
 
         metadata_path = save_folder / "metadata.json"
         metadata_path.write_text(json.dumps(json_safe(metadata), indent=4), encoding="utf-8")
 
-        log(f"Saved training run to: {save_folder}")
-        return save_folder
+    def load_training_run(self, interval: str, load_model: str = "latest") -> dict:
+        save_folder = Path(MODEL_DIR) / f"{interval} Models"
+        models_root = save_folder / "models"
 
-    def training_full_models(self, interval: str) -> bool:
+        if load_model == "latest":
+            model_folders = sorted([p for p in models_root.iterdir() if p.is_dir()])
+            if not model_folders: raise FileNotFoundError(f"No saved models found in {models_root}")
+            model_folder = model_folders[-1]
+        else:
+            model_folder = Path(load_model)
+            if not model_folder.exists():
+                raise FileNotFoundError(f"Model folder does not exist: {model_folder}")
+
+        self.feature_cols = joblib.load(save_folder / "features.joblib")
+
+        metadata_path = save_folder / "metadata.json"
+        if metadata_path.exists():
+            metadata = json.loads(metadata_path.read_text())
+            self.split_date = pd.Timestamp(metadata.get("end_date"))
+
+        models = {
+            "LGBM": joblib.load(model_folder / "lgbm_model.joblib"),
+            "CAT": joblib.load(model_folder / "cat_model.joblib"),
+        }
+        return models
+
+    def predict_latest(self, interval: str, data_dict: dict, models: dict) -> pd.DataFrame:
+        save_folder = Path(MODEL_DIR) / f"{interval} Models"
+
+        log("Building latest prediction universe...")
+        pred_data = self.build_universe(interval, data_dict, drop_unlabelled=False)
+        pred_data = self._prepare_data(pred_data, train=False)
+
+        latest_date = pred_data["Date"].max()
+        latest = pred_data[pred_data["Date"] == latest_date].copy()
+
+        X_latest = latest[self.feature_cols].to_numpy(dtype=np.float32)
+
+        latest["pred_lgbm"] = models["LGBM"].predict(X_latest)
+        latest["pred_cat"] = models["CAT"].predict(X_latest)
+
+        latest = add_ensemble_predictions(latest)
+        latest = self.add_cross_sectional_signals(latest)
+
+        picks = latest[(latest["ensemble_agreement"] == 1) & (latest["pred_signal"] == 1)].copy()
+        picks = picks.sort_values("pred", ascending=False).head(self.config.max_top_tickers)
+
+        picks["signal_date"] = latest_date
+        picks["paper_action"] = "BUY_NEXT_OPEN"
+        picks["target_weight"] = 1.0 / len(picks) if len(picks) else 0.0
+
+        cols = [
+            "signal_date", "ticker", "paper_action", "target_weight",
+            "pred", "pred_cat", "pred_lgbm",
+            "ensemble_score", "cat_rank_pct", "lgbm_rank_pct",
+        ]
+        picks = picks[[c for c in cols if c in picks.columns]]
+
+        pred_dir = Path(save_folder) / "predictions"
+        pred_dir.mkdir(parents=True, exist_ok=True)
+
+        date_str = pd.Timestamp(latest_date).strftime("%Y-%m-%d")
+
+        latest.to_parquet(pred_dir / f"all_predictions_{interval}_{date_str}.parquet", index=False)
+        latest.to_parquet(pred_dir / "latest_all_predictions.parquet", index=False)
+
+        picks.to_csv(pred_dir / f"paper_signals_{interval}_{date_str}.csv", index=False)
+        picks.to_csv(pred_dir / "latest_paper_signals.csv", index=False)
+
+        log(f"Saved all predictions to: {pred_dir / f'all_predictions_{interval}_{date_str}.parquet'}")
+        log(f"Saved paper signals to: {pred_dir / f'paper_signals_{interval}_{date_str}.csv'}")
+
+        log("Paper trade picks:")
+        log(picks.to_string(index=False))
+
+        return picks
+
+    def run_pipeline(self, interval: str, load_model=None) -> bool:
         if interval == "1d":
             self.config.horizon = 40
             self.config.max_top_tickers = 30
@@ -452,26 +483,33 @@ class TrainingManager:
             self.config.horizon = 30
             self.config.max_top_tickers = 10
 
-        log("Building universe dataframe...")
-        data = self.build_universe_frame(interval)
+        log("Loading raw data...")
+        data_dict = self.load_raw_data(interval)
 
-        log("Preparing pooled features...")
-        self._prepare_data(data)
+        if load_model is not None:
+            models = self.load_training_run(interval, load_model)
 
-        results = {}
+        else:
+            log("Building universe dataframe...")
+            data = self.build_universe(interval, data_dict)
 
-        log("Training LightGBM...")
-        results["LGBM"] = self._train_lightgbm(interval)
-        flush_memory()
-        log(json.dumps({k: v for k, v in results["LGBM"].items() if k not in {"model", "test_df", "base_df"}}, indent=4))
+            log("Preparing pooled features...")
+            self._prepare_data(data)
 
-        log("Training CatBoost...")
-        results["CAT"] = self._train_catboost(interval)
-        flush_memory()
-        log(json.dumps({k: v for k, v in results["CAT"].items() if k not in {"model", "test_df", "base_df"}}, indent=4))
+            models = {}
 
-        log("Saving assets...")
-        self.save_training_run(interval, results)
+            log("Training LightGBM...")
+            models["LGBM"] = self._train_model(interval, "LGBM")
+            flush_memory()
+
+            log("Training CatBoost...")
+            models["CAT"] = self._train_model(interval, "CAT")
+            flush_memory()
+
+            log("Saving assets...")
+            self.save_training_run(interval, models)
+
+        self.predict_latest(interval, data_dict, models)
         return True
 
 ########################################################################################################################
@@ -528,45 +566,70 @@ def analyse_position_attribution(position_df: pd.DataFrame) -> dict[str, pd.Data
         "concentration": concentration,
     }
 
-def add_next_open_execution_returns(df: pd.DataFrame) -> pd.DataFrame:
+def add_next_open_execution_returns(df: pd.DataFrame, data_dict: dict, interval: str) -> pd.DataFrame:
     df = df.copy()
     df["Date"] = pd.to_datetime(df["Date"])
 
-    if "Adj Open" in df.columns:
-        price_col = "Adj Open"
-    elif {"Open", "Close", "Adj Close"}.issubset(df.columns):
-        adj_factor = df["Adj Close"] / df["Close"]
-        df["exec_open"] = df["Open"] * adj_factor
-        price_col = "exec_open"
-    elif "Open" in df.columns:
-        price_col = "Open"
-    else:
-        raise ValueError("Need Adj Open, or Open + Close + Adj Close, to create execution prices.")
-
-    df = df.sort_values(["ticker", "Date"])
-    grouped = df.groupby("ticker", group_keys=False)
-
-    df["exec_entry_date"] = grouped["Date"].shift(-1)
-    df["exec_exit_date"] = grouped["Date"].shift(-2)
-
-    df["exec_entry_price_mid"] = grouped[price_col].shift(-1)
-    df["exec_exit_price_mid"] = grouped[price_col].shift(-2)
-
+    frames: list[pd.DataFrame] = []
     half_spread = 1.0 / 20_000
+    log("")
+    for ticker, group in tqdm(df.groupby("ticker", sort=False), desc="Adding open returns"):
+        raw = data_dict.get(ticker, pd.DataFrame())
+        if raw is None or raw.empty: continue
 
-    df["long_entry_price"] = df["exec_entry_price_mid"] * (1.0 + half_spread)
-    df["long_exit_price"] = df["exec_exit_price_mid"] * (1.0 - half_spread)
-    df["long_exec_return"] = df["long_exit_price"] / df["long_entry_price"] - 1.0
+        raw = raw.copy()
+        raw.index = pd.to_datetime(raw.index, utc=True).tz_localize(None)
+        raw = raw[~raw.index.duplicated(keep="first")].sort_index()
 
-    df["short_entry_price"] = df["exec_entry_price_mid"] * (1.0 - half_spread)
-    df["short_exit_price"] = df["exec_exit_price_mid"] * (1.0 + half_spread)
-    df["short_exec_return"] = df["short_entry_price"] / df["short_exit_price"] - 1.0
+        if "Adj Open" in raw.columns:
+            raw["exec_open"] = raw["Adj Open"].astype(float)
+        elif {"Open", "Close", "Adj Close"}.issubset(raw.columns):
+            adj_factor = raw["Adj Close"].astype(float) / raw["Close"].astype(float)
+            raw["exec_open"] = raw["Open"].astype(float) * adj_factor
+        elif "Open" in raw.columns:
+            raw["exec_open"] = raw["Open"].astype(float)
+        else:
+            continue
 
-    df["exec_return"] = df["long_exec_return"]
-    return df.sort_values(["Date", "ticker"])
+        g = group.copy()
+        signal_dates = g["Date"].to_numpy(dtype="datetime64[ns]")
+        raw_dates = raw.index.to_numpy(dtype="datetime64[ns]")
+        raw_open = raw["exec_open"].to_numpy(dtype=float)
 
-def prepare_manager_with_cutoff(manager: TrainingManager, train_data: pd.DataFrame, full_data: pd.DataFrame, cutoff_date) -> pd.DataFrame:
-    cutoff_date = pd.Timestamp(cutoff_date)
+        entry_idx = np.searchsorted(raw_dates, signal_dates, side="right")
+        exit_idx = entry_idx + 1
+
+        valid = exit_idx < len(raw)
+
+        g["exec_entry_date"] = pd.NaT
+        g["exec_exit_date"] = pd.NaT
+        g["exec_entry_price_mid"] = np.nan
+        g["exec_exit_price_mid"] = np.nan
+
+        g.loc[valid, "exec_entry_date"] = raw.index[entry_idx[valid]]
+        g.loc[valid, "exec_exit_date"] = raw.index[exit_idx[valid]]
+
+        g.loc[valid, "exec_entry_price_mid"] = raw_open[entry_idx[valid]]
+        g.loc[valid, "exec_exit_price_mid"] = raw_open[exit_idx[valid]]
+
+        g["long_entry_price"] = g["exec_entry_price_mid"] * (1.0 + half_spread)
+        g["long_exit_price"] = g["exec_exit_price_mid"] * (1.0 - half_spread)
+        g["long_exec_return"] = g["long_exit_price"] / g["long_entry_price"] - 1.0
+
+        g["short_entry_price"] = g["exec_entry_price_mid"] * (1.0 - half_spread)
+        g["short_exit_price"] = g["exec_exit_price_mid"] * (1.0 + half_spread)
+        g["short_exec_return"] = g["short_entry_price"] / g["short_exit_price"] - 1.0
+
+        g["exec_return"] = g["long_exec_return"]
+
+        frames.append(g)
+
+    log("")
+    if not frames: raise ValueError("No execution returns could be calculated.")
+    return pd.concat(frames, axis=0, ignore_index=True).sort_values(["Date", "ticker"])
+
+def prepare_manager_with_cutoff(manager: TrainingManager, train_data: pd.DataFrame, full_data: pd.DataFrame, cutoff_date: pd.Timestamp) -> pd.DataFrame:
+    cutoff_date: pd.Timestamp = pd.Timestamp(cutoff_date) # noqa
 
     train_data = train_data.copy()
     full_data = full_data.copy()
@@ -674,14 +737,14 @@ def save_walk_forward_results(
         worst_position_days = attribution.get("worst_position_days")
         concentration = attribution.get("concentration", {})
 
-        if ticker_summary is not None and not ticker_summary.empty:
-            ticker_summary.to_csv(folder / "ticker_attribution.csv", index=False)
+        if ticker_summary is not None and not ticker_summary.empty: # noqa
+            ticker_summary.to_csv(folder / "ticker_attribution.csv", index=False) # noqa
 
-        if best_position_days is not None and not best_position_days.empty:
-            best_position_days.to_csv(folder / "best_position_days.csv", index=False)
+        if best_position_days is not None and not best_position_days.empty: # noqa
+            best_position_days.to_csv(folder / "best_position_days.csv", index=False) # noqa
 
-        if worst_position_days is not None and not worst_position_days.empty:
-            worst_position_days.to_csv(folder / "worst_position_days.csv", index=False)
+        if worst_position_days is not None and not worst_position_days.empty: # noqa
+            worst_position_days.to_csv(folder / "worst_position_days.csv", index=False) # noqa
 
         (folder / "attr_summary.json").write_text(json.dumps(json_safe(concentration), indent=4), encoding="utf-8")
 
@@ -729,23 +792,22 @@ def run_walk_forward_backtest(interval: str, months_back: int) -> dict[str, Any]
         manager.config.max_top_tickers = 10
 
     model_type = "ENSEMBLE"
-    log(f"{'=' * 50}\nWALK-FORWARD BACKTEST: {model_type} {interval}\n{'=' * 50}")
+    log(f"{'=' * 50}\nWALK-FORWARD BACKTEST ({interval}): cutoff = {months_back} months\n{'=' * 50}")
 
-    spy_df = pd.read_parquet(os.path.join(DATA_DIR, f"SPY_{interval}.parquet"))
-    spy_df.index.name = "Date"
-    spy_df.index = pd.to_datetime(spy_df.index, utc=True).tz_localize(None)
+    log("Loading all tickers...")
+    data_dict = manager.load_raw_data(interval)
 
-    latest_date = pd.Timestamp(spy_df.index.max())
-    cutoff_date = latest_date - pd.DateOffset(months=months_back)
+    latest_date = pd.Timestamp( next(iter(data_dict.values())) .index.max() )
+    cutoff_date: pd.Timestamp = latest_date - pd.DateOffset(months=months_back) # noqa
 
     log(f"Latest available date: {latest_date.strftime('%Y-%m-%d')}")
     log(f"Cutoff date: {cutoff_date.strftime('%Y-%m-%d')}")
 
     log("Building training universe up to cutoff...")
-    train_data = manager.build_universe_frame(interval, True, cutoff_date)
+    train_data = manager.build_universe(interval, data_dict, True, cutoff_date)
 
     log("Building full universe for walk-forward predictions...")
-    full_data = manager.build_universe_frame(interval, False)
+    full_data = manager.build_universe(interval, data_dict, False)
 
     walk_df = prepare_manager_with_cutoff(manager, train_data, full_data, cutoff_date)
 
@@ -763,7 +825,7 @@ def run_walk_forward_backtest(interval: str, months_back: int) -> dict[str, Any]
     walk_df["pred_lgbm"] = lgbm_model.predict(X_walk)
 
     walk_df = add_ensemble_predictions(walk_df)
-    walk_df = add_next_open_execution_returns(walk_df)
+    walk_df = add_next_open_execution_returns(walk_df, data_dict, interval)
 
     dates = list(sorted(pd.to_datetime(walk_df["Date"]).unique()))
     by_date = {date: group.copy() for date, group in walk_df.groupby("Date", sort=True)}
@@ -807,7 +869,7 @@ def run_walk_forward_backtest(interval: str, months_back: int) -> dict[str, Any]
             weak_short = side == -1 and row["pred"] >= -manager.config.exit_pred_threshold
             too_old = age >= max_holding_days
 
-            if opposite_signal or weak_long or weak_short or too_old:
+            if opposite_signal or weak_long or weak_short or too_old: # noqa
                 holdings.pop(ticker)
                 turnover += 1
 
@@ -928,7 +990,7 @@ def run_walk_forward_backtest(interval: str, months_back: int) -> dict[str, Any]
 
     cagr_like = (equity / 1000.0) ** (1 / years) - 1.0 if years > 0 else 0.0
 
-    sharpe_like = returns.mean() / (returns.std() + 1e-9) * annualiser
+    sharpe_like = returns.mean() / (returns.std() + 1e-9) * annualiser # noqa
     attribution = analyse_position_attribution(position_df)
 
     summary = {
@@ -936,8 +998,8 @@ def run_walk_forward_backtest(interval: str, months_back: int) -> dict[str, Any]
         "model_type": model_type,
         "months_back": months_back,
         "cutoff_date": cutoff_date.strftime("%Y-%m-%d"),
-        "start_date": daily_df["Date"].min().strftime("%Y-%m-%d"),
-        "end_date": daily_df["Date"].max().strftime("%Y-%m-%d"),
+        "start_date": daily_df["Date"].min().strftime("%Y-%m-%d"), # noqa
+        "end_date": daily_df["Date"].max().strftime("%Y-%m-%d"), # noqa
         "initial_capital": 1000.0,
         "final_equity": float(equity),
         "profit_loss": float(equity - 1000.0),
@@ -966,13 +1028,13 @@ if __name__ == "__main__":
     start = time.perf_counter()
 
     print("Training...")
-    # mng = TrainingManager()
-    # mng.run_training_pipeline("1d")
+    mng = TrainingManager()
+    mng.run_pipeline("1d")
 
-    for mon in [3,6,12]:
-        run_walk_forward_backtest(
-            interval="1d",
-            months_back=mon,
-        )
+    # for mon in [3,6,12]:
+    #     run_walk_forward_backtest(
+    #         interval="1d",
+    #         months_back=mon,
+    #     )
 
     print(f"Total time: {time.perf_counter() - start:.1f}s")
