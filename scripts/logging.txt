@@ -1,0 +1,492 @@
+Features: 66
+Train rows: 578,739
+Test rows: 323,546
+Split date: 2019-07-24
+Baselines:
+{
+    "random": {
+        "trade_rate": 0.025761406415161985,
+        "long_rate": 0.025761406415161985,
+        "short_rate": 0.0,
+        "hit_rate": 0.4818236352729454,
+        "mean_return": 0.01244514831910847,
+        "median_return": -0.005812922291992337,
+        "sharpe_like": 0.13673628034591473,
+        "rank_ic_mean": 0.0018482978379478995,
+        "rank_ic_ir": 0.025429205398750675,
+        "n_trades": 8335,
+        "long_stats": {
+            "hit_rate": 0.4818236352729454,
+            "mean_return": 0.01244514831910847,
+            "median_return": -0.005812922291992337,
+            "n": 8335
+        },
+        "short_stats": {
+            "hit_rate": 0.0,
+            "mean_return": 0.0,
+            "median_return": 0.0,
+            "n": 0
+        }
+    },
+    "momentum_1m": {
+        "trade_rate": 0.025749043412683203,
+        "long_rate": 0.025749043412683203,
+        "short_rate": 0.0,
+        "hit_rate": 0.4774936982355059,
+        "mean_return": 0.015257338071942017,
+        "median_return": -0.007849352736424245,
+        "sharpe_like": 0.13928854541713018,
+        "rank_ic_mean": -0.018771688792011014,
+        "rank_ic_ir": -0.1160816883407632,
+        "n_trades": 8331,
+        "long_stats": {
+            "hit_rate": 0.4774936982355059,
+            "mean_return": 0.015257338071942017,
+            "median_return": -0.007849352736424245,
+            "n": 8331
+        },
+        "short_stats": {
+            "hit_rate": 0.0,
+            "mean_return": 0.0,
+            "median_return": 0.0,
+            "n": 0
+        }
+    },
+    "reversal_1m": {
+        "trade_rate": 0.025745952662063507,
+        "long_rate": 0.025745952662063507,
+        "short_rate": 0.0,
+        "hit_rate": 0.5026410564225691,
+        "mean_return": 0.030112676531522647,
+        "median_return": 0.0012727749200336274,
+        "sharpe_like": 0.30774668333219946,
+        "rank_ic_mean": 0.018771688792011014,
+        "rank_ic_ir": 0.1160816883407632,
+        "n_trades": 8330,
+        "long_stats": {
+            "hit_rate": 0.5026410564225691,
+            "mean_return": 0.030112676531522647,
+            "median_return": 0.0012727749200336274,
+            "n": 8330
+        },
+        "short_stats": {
+            "hit_rate": 0.0,
+            "mean_return": 0.0,
+            "median_return": 0.0,
+            "n": 0
+        }
+    }
+}
+{
+    "type": "LGBM",
+    "mae": 0.12865886869791213,
+    "rmse": 0.20308510826956147,
+    "trade_rate": 0.025749043412683203,
+    "long_rate": 0.025749043412683203,
+    "short_rate": 0.0,
+    "hit_rate": 0.5205857640139239,
+    "mean_return": 0.03797195045845695,
+    "median_return": 0.006724877717678824,
+    "sharpe_like": 0.38859275867050375,
+    "rank_ic_mean": 0.0409975192679467,
+    "rank_ic_ir": 0.26344727622698544,
+    "n_trades": 8331,
+    "long_stats": {
+        "hit_rate": 0.5205857640139239,
+        "mean_return": 0.03797195045845695,
+        "median_return": 0.006724877717678824,
+        "n": 8331
+    },
+    "short_stats": {
+        "hit_rate": 0.0,
+        "mean_return": 0.0,
+        "median_return": 0.0,
+        "n": 0
+    },
+    "portfolio": {
+        "portfolio_days": 1666,
+        "portfolio_total_return": 8.99633399361462,
+        "portfolio_cagr_like": 0.4165647064624245,
+        "portfolio_sharpe_like": 1.1488706126787622,
+        "portfolio_max_drawdown": -0.5234788067383531,
+        "portfolio_win_rate": 0.5396158463385354,
+        "portfolio_mean_daily_return": 0.0016378283030907632,
+        "portfolio_median_daily_return": 0.0014052021582869028,
+        "portfolio_avg_holdings": 16.054621848739497,
+        "portfolio_avg_turnover": 1.6794717887154862
+    },
+    "yearly_portfolio": {
+        "2019": {
+            "portfolio_days": 110,
+            "portfolio_total_return": 0.30067621620879814,
+            "portfolio_cagr_like": 0.8262122672020347,
+            "portfolio_sharpe_like": 3.306512603511257,
+            "portfolio_max_drawdown": -0.07907581427382826,
+            "portfolio_win_rate": 0.5727272727272728,
+            "portfolio_mean_daily_return": 0.002461707955512182,
+            "portfolio_median_daily_return": 0.0021329103293128843,
+            "portfolio_avg_holdings": 17.8,
+            "portfolio_avg_turnover": 1.6363636363636365
+        },
+        "2020": {
+            "portfolio_days": 252,
+            "portfolio_total_return": 0.4450494132675671,
+            "portfolio_cagr_like": 0.4450494132675671,
+            "portfolio_sharpe_like": 0.922934442896018,
+            "portfolio_max_drawdown": -0.5219970935541133,
+            "portfolio_win_rate": 0.5277777777777778,
+            "portfolio_mean_daily_return": 0.0021285154663268397,
+            "portfolio_median_daily_return": 0.0014658842164144256,
+            "portfolio_avg_holdings": 12.468253968253968,
+            "portfolio_avg_turnover": 1.4444444444444444
+        },
+        "2021": {
+            "portfolio_days": 251,
+            "portfolio_total_return": 0.2777583228681382,
+            "portfolio_cagr_like": 0.2790066924833676,
+            "portfolio_sharpe_like": 1.186397847617429,
+            "portfolio_max_drawdown": -0.14139817395021304,
+            "portfolio_win_rate": 0.545816733067729,
+            "portfolio_mean_daily_return": 0.0010811471524423675,
+            "portfolio_median_daily_return": 0.0012640929805621888,
+            "portfolio_avg_holdings": 16.394422310756973,
+            "portfolio_avg_turnover": 1.593625498007968
+        },
+        "2022": {
+            "portfolio_days": 250,
+            "portfolio_total_return": -0.2298548764256908,
+            "portfolio_cagr_like": -0.23146234579979563,
+            "portfolio_sharpe_like": -0.26997702824103903,
+            "portfolio_max_drawdown": -0.3373029012294311,
+            "portfolio_win_rate": 0.468,
+            "portfolio_mean_daily_return": -0.0005417678932820634,
+            "portfolio_median_daily_return": -0.0019928143289295657,
+            "portfolio_avg_holdings": 18.22,
+            "portfolio_avg_turnover": 1.452
+        },
+        "2023": {
+            "portfolio_days": 249,
+            "portfolio_total_return": 1.257032039318763,
+            "portfolio_cagr_like": 1.2792775596337562,
+            "portfolio_sharpe_like": 3.110506753165826,
+            "portfolio_max_drawdown": -0.13395130749082573,
+            "portfolio_win_rate": 0.5582329317269076,
+            "portfolio_mean_daily_return": 0.00342594358625701,
+            "portfolio_median_daily_return": 0.0025334849682286604,
+            "portfolio_avg_holdings": 16.14859437751004,
+            "portfolio_avg_turnover": 1.678714859437751
+        },
+        "2024": {
+            "portfolio_days": 251,
+            "portfolio_total_return": 0.4419419147590373,
+            "portfolio_cagr_like": 0.44404598788674376,
+            "portfolio_sharpe_like": 1.8522990006411595,
+            "portfolio_max_drawdown": -0.11449028562210561,
+            "portfolio_win_rate": 0.5776892430278885,
+            "portfolio_mean_daily_return": 0.0015468308624829732,
+            "portfolio_median_daily_return": 0.002830568266936388,
+            "portfolio_avg_holdings": 16.49800796812749,
+            "portfolio_avg_turnover": 2.1075697211155378
+        },
+        "2025": {
+            "portfolio_days": 249,
+            "portfolio_total_return": 0.5888562788578515,
+            "portfolio_cagr_like": 0.5977444614968015,
+            "portfolio_sharpe_like": 1.8645329607310186,
+            "portfolio_max_drawdown": -0.1772175976144168,
+            "portfolio_win_rate": 0.5502008032128514,
+            "portfolio_mean_daily_return": 0.0020047387122550035,
+            "portfolio_median_daily_return": 0.001359716154870814,
+            "portfolio_avg_holdings": 14.831325301204819,
+            "portfolio_avg_turnover": 1.714859437751004
+        }
+    },
+    "cost_sensitivity": {
+        "10bps": {
+            "portfolio_days": 1666,
+            "portfolio_total_return": 8.99633399361462,
+            "portfolio_cagr_like": 0.4165647064624245,
+            "portfolio_sharpe_like": 1.1488706126787622,
+            "portfolio_max_drawdown": -0.5234788067383531,
+            "portfolio_win_rate": 0.5396158463385354,
+            "portfolio_mean_daily_return": 0.0016378283030907632,
+            "portfolio_median_daily_return": 0.0014052021582869028,
+            "portfolio_avg_holdings": 16.054621848739497,
+            "portfolio_avg_turnover": 1.6794717887154862
+        },
+        "25bps": {
+            "portfolio_days": 1666,
+            "portfolio_total_return": 7.692713858456603,
+            "portfolio_cagr_like": 0.38693822220109286,
+            "portfolio_sharpe_like": 1.0899749236553735,
+            "portfolio_max_drawdown": -0.5244281036849001,
+            "portfolio_win_rate": 0.5372148859543817,
+            "portfolio_mean_daily_return": 0.0015538547136549887,
+            "portfolio_median_daily_return": 0.0013131519886369182,
+            "portfolio_avg_holdings": 16.054621848739497,
+            "portfolio_avg_turnover": 1.6794717887154862
+        },
+        "50bps": {
+            "portfolio_days": 1666,
+            "portfolio_total_return": 5.886413004072733,
+            "portfolio_cagr_like": 0.3389219260881047,
+            "portfolio_sharpe_like": 0.9917900658310455,
+            "portfolio_max_drawdown": -0.5260064629167185,
+            "portfolio_win_rate": 0.5354141656662665,
+            "portfolio_mean_daily_return": 0.0014138987312620314,
+            "portfolio_median_daily_return": 0.0011674385695123887,
+            "portfolio_avg_holdings": 16.054621848739497,
+            "portfolio_avg_turnover": 1.6794717887154862
+        },
+        "100bps": {
+            "portfolio_days": 1666,
+            "portfolio_total_return": 3.321089512977867,
+            "portfolio_cagr_like": 0.24778614030108548,
+            "portfolio_sharpe_like": 0.7953564189353975,
+            "portfolio_max_drawdown": -0.5291489689449619,
+            "portfolio_win_rate": 0.5264105642256903,
+            "portfolio_mean_daily_return": 0.0011339867664761172,
+            "portfolio_median_daily_return": 0.0009490610365137642,
+            "portfolio_avg_holdings": 16.054621848739497,
+            "portfolio_avg_turnover": 1.6794717887154862
+        }
+    }
+}
+{
+    "type": "CAT",
+    "mae": 0.12386465496313126,
+    "rmse": 0.19727543452322763,
+    "trade_rate": 0.02572431740772564,
+    "long_rate": 0.02572431740772564,
+    "short_rate": 0.0,
+    "hit_rate": 0.5339420881893548,
+    "mean_return": 0.04164712580681524,
+    "median_return": 0.013650167445338531,
+    "sharpe_like": 0.4223605798163173,
+    "rank_ic_mean": 0.058854431181703054,
+    "rank_ic_ir": 0.3698002267658267,
+    "n_trades": 8323,
+    "long_stats": {
+        "hit_rate": 0.5339420881893548,
+        "mean_return": 0.04164712580681524,
+        "median_return": 0.013650167445338531,
+        "n": 8323
+    },
+    "short_stats": {
+        "hit_rate": 0.0,
+        "mean_return": 0.0,
+        "median_return": 0.0,
+        "n": 0
+    },
+    "portfolio": {
+        "portfolio_days": 1666,
+        "portfolio_total_return": 12.268218522778202,
+        "portfolio_cagr_like": 0.47855404026874737,
+        "portfolio_sharpe_like": 1.2859160807189434,
+        "portfolio_max_drawdown": -0.4495907709015675,
+        "portfolio_win_rate": 0.5408163265306123,
+        "portfolio_mean_daily_return": 0.0017974107622409747,
+        "portfolio_median_daily_return": 0.0014205923605288117,
+        "portfolio_avg_holdings": 14.799519807923168,
+        "portfolio_avg_turnover": 1.3331332533013205
+    },
+    "yearly_portfolio": {
+        "2019": {
+            "portfolio_days": 110,
+            "portfolio_total_return": 0.33351028993722887,
+            "portfolio_cagr_like": 0.9335496267206425,
+            "portfolio_sharpe_like": 3.6000169583777333,
+            "portfolio_max_drawdown": -0.06377958388956861,
+            "portfolio_win_rate": 0.5818181818181818,
+            "portfolio_mean_daily_return": 0.0026895300774282135,
+            "portfolio_median_daily_return": 0.0023725427013710438,
+            "portfolio_avg_holdings": 14.672727272727272,
+            "portfolio_avg_turnover": 1.3636363636363635
+        },
+        "2020": {
+            "portfolio_days": 252,
+            "portfolio_total_return": 0.5230240815941194,
+            "portfolio_cagr_like": 0.5230240815941194,
+            "portfolio_sharpe_like": 1.0208800648220608,
+            "portfolio_max_drawdown": -0.4518871470204344,
+            "portfolio_win_rate": 0.49603174603174605,
+            "portfolio_mean_daily_return": 0.00230010104202053,
+            "portfolio_median_daily_return": -7.358062783722195e-05,
+            "portfolio_avg_holdings": 12.76984126984127,
+            "portfolio_avg_turnover": 1.4523809523809523
+        },
+        "2021": {
+            "portfolio_days": 251,
+            "portfolio_total_return": 0.4256632681421977,
+            "portfolio_cagr_like": 0.42767900723276475,
+            "portfolio_sharpe_like": 1.4890785822294046,
+            "portfolio_max_drawdown": -0.13016867750326133,
+            "portfolio_win_rate": 0.5378486055776892,
+            "portfolio_mean_daily_return": 0.0015490461425623021,
+            "portfolio_median_daily_return": 0.0011399490095950389,
+            "portfolio_avg_holdings": 16.46215139442231,
+            "portfolio_avg_turnover": 1.2350597609561753
+        },
+        "2022": {
+            "portfolio_days": 250,
+            "portfolio_total_return": -0.1344467203461942,
+            "portfolio_cagr_like": -0.13544593575140118,
+            "portfolio_sharpe_like": -0.024493342745278285,
+            "portfolio_max_drawdown": -0.31860013531542064,
+            "portfolio_win_rate": 0.468,
+            "portfolio_mean_daily_return": -5.033262373597308e-05,
+            "portfolio_median_daily_return": -0.0022518926581540817,
+            "portfolio_avg_holdings": 15.312,
+            "portfolio_avg_turnover": 1.032
+        },
+        "2023": {
+            "portfolio_days": 249,
+            "portfolio_total_return": 1.1054983356520713,
+            "portfolio_cagr_like": 1.124470694298596,
+            "portfolio_sharpe_like": 3.204404532877178,
+            "portfolio_max_drawdown": -0.14822441638194073,
+            "portfolio_win_rate": 0.5582329317269076,
+            "portfolio_mean_daily_return": 0.0031122087796047805,
+            "portfolio_median_daily_return": 0.001791864951270099,
+            "portfolio_avg_holdings": 13.518072289156626,
+            "portfolio_avg_turnover": 1.3092369477911647
+        },
+        "2024": {
+            "portfolio_days": 251,
+            "portfolio_total_return": 0.4245334085273702,
+            "portfolio_cagr_like": 0.4265430441108975,
+            "portfolio_sharpe_like": 1.9959417249361548,
+            "portfolio_max_drawdown": -0.10031225547239353,
+            "portfolio_win_rate": 0.5657370517928287,
+            "portfolio_mean_daily_return": 0.0014797462966324876,
+            "portfolio_median_daily_return": 0.0013914322899615725,
+            "portfolio_avg_holdings": 15.784860557768924,
+            "portfolio_avg_turnover": 1.6294820717131475
+        },
+        "2025": {
+            "portfolio_days": 249,
+            "portfolio_total_return": 0.9314944369774791,
+            "portfolio_cagr_like": 0.9468745196251265,
+            "portfolio_sharpe_like": 2.990501043157628,
+            "portfolio_max_drawdown": -0.12424198132452069,
+            "portfolio_win_rate": 0.5823293172690763,
+            "portfolio_mean_daily_return": 0.0027527921538600224,
+            "portfolio_median_daily_return": 0.0025934212444007525,
+            "portfolio_avg_holdings": 12.305220883534137,
+            "portfolio_avg_turnover": 1.1726907630522088
+        }
+    },
+    "cost_sensitivity": {
+        "10bps": {
+            "portfolio_days": 1666,
+            "portfolio_total_return": 12.268218522778202,
+            "portfolio_cagr_like": 0.47855404026874737,
+            "portfolio_sharpe_like": 1.2859160807189434,
+            "portfolio_max_drawdown": -0.4495907709015675,
+            "portfolio_win_rate": 0.5408163265306123,
+            "portfolio_mean_daily_return": 0.0017974107622409747,
+            "portfolio_median_daily_return": 0.0014205923605288117,
+            "portfolio_avg_holdings": 14.799519807923168,
+            "portfolio_avg_turnover": 1.3331332533013205
+        },
+        "25bps": {
+            "portfolio_days": 1666,
+            "portfolio_total_return": 10.875771052362712,
+            "portfolio_cagr_like": 0.45396478551704234,
+            "portfolio_sharpe_like": 1.2382968952814275,
+            "portfolio_max_drawdown": -0.45078527350065034,
+            "portfolio_win_rate": 0.5396158463385354,
+            "portfolio_mean_daily_return": 0.0017307540995759089,
+            "portfolio_median_daily_return": 0.0013480921099535493,
+            "portfolio_avg_holdings": 14.799519807923168,
+            "portfolio_avg_turnover": 1.3331332533013205
+        },
+        "50bps": {
+            "portfolio_days": 1666,
+            "portfolio_total_return": 8.871800488401695,
+            "portfolio_cagr_like": 0.4138811232275481,
+            "portfolio_sharpe_like": 1.1588970049003924,
+            "portfolio_max_drawdown": -0.45277091500122524,
+            "portfolio_win_rate": 0.539015606242497,
+            "portfolio_mean_daily_return": 0.0016196596618007985,
+            "portfolio_median_daily_return": 0.0012366113432031856,
+            "portfolio_avg_holdings": 14.799519807923168,
+            "portfolio_avg_turnover": 1.3331332533013205
+        },
+        "100bps": {
+            "portfolio_days": 1666,
+            "portfolio_total_return": 5.820441802940373,
+            "portfolio_cagr_like": 0.33697381110261837,
+            "portfolio_sharpe_like": 0.9999886119273584,
+            "portfolio_max_drawdown": -0.45673230108263785,
+            "portfolio_win_rate": 0.5306122448979592,
+            "portfolio_mean_daily_return": 0.0013974707862505786,
+            "portfolio_median_daily_return": 0.0010580562857994448,
+            "portfolio_avg_holdings": 14.799519807923168,
+            "portfolio_avg_turnover": 1.3331332533013205
+        }
+    }
+}
+Best model: CAT
+Latest ranked predictions:
+      Date ticker profile_group      pred  pred_signal  target_excess_return  future_return  benchmark_future_return
+2026-03-12    SMR         vol_5  0.167884            1             -0.256994       0.067177                 0.110462
+2026-03-12   QUBT         vol_5  0.149588            0              0.046905       0.291190                 0.110462
+2026-03-12   FISV         vol_3  0.092778            1             -0.089725      -0.010523                 0.110462
+2026-03-12    GIS         vol_1  0.092636            1             -0.103577      -0.104940                 0.110462
+2026-03-12    ACI         vol_1  0.072361            0             -0.052656      -0.050385                 0.110462
+2026-03-12    CAG         vol_1  0.068355            0             -0.131287      -0.126160                 0.110462
+2026-03-12      U         vol_5  0.056034            0              0.230274       0.449305                 0.110462
+2026-03-12   LUMN         vol_5  0.049553            0              0.089597       0.316770                 0.110462
+2026-03-12    BSX         vol_2  0.048946            1             -0.280062      -0.213275                 0.110462
+2026-03-12    APA         vol_4  0.047352            1             -0.054999       0.058018                 0.110462
+2026-03-12   INVH         vol_1  0.042416            0              0.111438       0.158124                 0.110462
+2026-03-12   KVUE         vol_2  0.040369            0             -0.014887       0.011501                 0.110462
+2026-03-12    IAG         vol_4  0.039599            0             -0.230157      -0.125351                 0.110462
+2026-03-12    OWL         vol_3  0.036520            0              0.045421       0.226481                 0.110462
+2026-03-12    HDB         vol_1  0.035820            0             -0.167919      -0.118704                 0.110462
+2026-03-12     CL         vol_1  0.034234            0             -0.010125      -0.004548                 0.110462
+2026-03-12    KHC         vol_1  0.031848            0              0.049553       0.072996                 0.110462
+2026-03-12   VICI         vol_1  0.031658            0             -0.013053       0.021944                 0.110462
+2026-03-12    EQX         vol_4  0.031536            0             -0.188620      -0.102387                 0.110462
+2026-03-12    ABT         vol_1  0.029688            0             -0.238690      -0.215378                 0.110462
+2026-03-12   PAAS         vol_4  0.028989            0             -0.123133      -0.015482                 0.110462
+2026-03-12   MARA         vol_5  0.027603            0              0.193636       0.477169                 0.110462
+2026-03-12   MDLZ         vol_1  0.026486            0              0.132656       0.142280                 0.110462
+2026-03-12    CNP         vol_1  0.026062            0             -0.054882      -0.038710                 0.110462
+2026-03-12   MSTR         vol_5  0.025374            0              0.089431       0.365880                 0.110462
+2026-03-12     WY         vol_1  0.024755            0             -0.043182       0.021711                 0.110462
+2026-03-12   CHWY         vol_4  0.022429            0             -0.161720      -0.066260                 0.110462
+2026-03-12    TGT         vol_2  0.021683            0             -0.009459       0.082073                 0.110462
+2026-03-12    UNH         vol_3  0.021132            0              0.336755       0.371521                 0.110462
+2026-03-12   MNST         vol_1  0.020769            0              0.085602       0.120795                 0.110462
+2026-03-12   SNOW         vol_4 -0.074252            0             -0.299906      -0.139915                 0.110462
+2026-03-12   ANET         vol_4 -0.086271            0             -0.138408       0.057748                 0.110462
+2026-03-12    UAL         vol_4 -0.086296            0             -0.069608       0.150815                 0.110462
+2026-03-12    CDE         vol_5 -0.086531            0             -0.322474      -0.144306                 0.110462
+2026-03-12   SMCI         vol_5 -0.088857            0             -0.111846       0.144660                 0.110462
+2026-03-12   AVGO         vol_4 -0.093284            0              0.061233       0.282561                 0.110462
+2026-03-12   MRVL         vol_4 -0.102417            0              0.678166       0.941544                 0.110462
+2026-03-12   PLTR         vol_4 -0.102560            0             -0.322664      -0.102280                 0.110462
+2026-03-12   NVDA         vol_4 -0.103325            0             -0.044949       0.175057                 0.110462
+2026-03-12    RDW         vol_5 -0.109594            0             -0.140636       0.167722                 0.110462
+2026-03-12   TSLA         vol_4 -0.114877            0             -0.168014       0.084403                 0.110462
+2026-03-12   DELL         vol_4 -0.119289            0              0.534872       0.737442                 0.110462
+2026-03-12   AMAT         vol_3 -0.120350            0              0.083977       0.291072                 0.110462
+2026-03-12   LRCX         vol_4 -0.122407            0              0.169908       0.403647                 0.110462
+2026-03-12   INTC         vol_5 -0.131329            0              1.550053       1.760663                 0.110462
+2026-03-12    WDC         vol_4 -0.132816            0              0.629188       0.837813                 0.110462
+2026-03-12   RIOT         vol_5 -0.148705            0              0.348146       0.660690                 0.110462
+2026-03-12    AMD         vol_4 -0.150572            0              1.065779       1.301962                 0.110462
+2026-03-12    APP         vol_5 -0.155144            0             -0.208490       0.042775                 0.110462
+2026-03-12   HOOD         vol_5 -0.163158            0             -0.289909       0.011955                 0.110462
+2026-03-12   NVTS         vol_5 -0.173599            0              0.528286       0.823647                 0.110462
+2026-03-12   LUNR         vol_5 -0.186449            0              0.347223       0.642290                 0.110462
+2026-03-12     AG         vol_5 -0.202065            0             -0.258055      -0.112464                 0.110462
+2026-03-12    VRT         vol_4 -0.205012            0              0.017919       0.281374                 0.110462
+2026-03-12     BE         vol_5 -0.205026            0              0.437060       0.660813                 0.110462
+2026-03-12   WULF         vol_5 -0.209869            0              0.248464       0.594410                 0.110462
+2026-03-12   RCAT         vol_5 -0.218168            0             -0.622746      -0.358292                 0.110462
+2026-03-12   FSLY         vol_5 -0.273421            0             -0.317145      -0.153179                 0.110462
+2026-03-12   RKLB         vol_5 -0.275799            0              0.269643       0.542636                 0.110462
+2026-03-12     MU         vol_4 -0.317134            0              0.590394       0.843157                 0.110462

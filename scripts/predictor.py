@@ -50,13 +50,34 @@ class UniverseConfig:
     replace_buffer: float = 0.002
     exit_pred_threshold: float = 0.0
 
+    min_price: float = 5.0
+    max_price: float = 5000.0
+
+    min_profile_adv: float = 5_000_000.0
+
+    min_rolling_dollar_volume_1d: float = 10_000_000.0
+    min_rolling_dollar_volume_1h: float = 750_000.0
+
+    max_abs_bar_return: float = 0.75
+
+    min_rows_after_filter_1d: int = 252
+    min_rows_after_filter_1h: int = 500
+
+    rolling_vol_window_1d: int = 63
+    rolling_beta_window_1d: int = 252
+
+    rolling_vol_window_1h: int = 120
+    rolling_beta_window_1h: int = 240
+
 def flush_memory():
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
 
-def log(string: str):
-    with open(f"testing.txt", "a") as f:
+now = datetime.now().strftime('%Y-%m-%d %H:%M')
+def log(string: str, prints: bool = True):
+    if prints: print(string)
+    with open(f"logging_{now}.txt", "a") as f:
         f.write(f"{string}\n")
 
 ########################################################################################################################
@@ -384,19 +405,347 @@ class TrainingManager:
         return True
 
 ########################################################################################################################
+    # new
+    def _min_rolling_dollar_volume(self, interval: str) -> float:
+        if interval == "1h":
+            return self.config.min_rolling_dollar_volume_1h
+        return self.config.min_rolling_dollar_volume_1d
 
-    @staticmethod
-    def add_forward_excess_target(df: pd.DataFrame, benchmark_close: pd.Series, horizon: int, beta: float = 1.0) -> pd.DataFrame:
+    def _min_rows_after_filter(self, interval: str) -> int:
+        if interval == "1h":
+            return self.config.min_rows_after_filter_1h
+        return self.config.min_rows_after_filter_1d
+
+    def _liquidity_window(self, interval: str) -> int:
+        if interval == "1h":
+            return 120  # roughly a few weeks of hourly bars
+        return 20  # about one trading month
+
+    def _passes_static_liquidity_filter(self, ticker: str, meta: dict[str, Any]) -> bool:
+        adv = meta.get("adv", np.nan)
+
+        if self.config.min_profile_adv > 0 and np.isfinite(adv):
+            if float(adv) < self.config.min_profile_adv:
+                log(f"Skipping {ticker}: profile ADV too low ({adv:,.0f})", False)
+                return False
+
+        return True
+
+    def _add_liquidity_columns(self, df: pd.DataFrame, interval: str) -> pd.DataFrame:
+        df = df.copy()
+
+        price_col = "Adj Close" if "Adj Close" in df.columns else "Close"
+        window = self._liquidity_window(interval)
+
+        df["dollar_volume"] = df[price_col].astype(float) * df["Volume"].astype(float)
+
+        # Shifted by 1 so today’s filter uses only previous bars.
+        df["rolling_dollar_volume"] = (
+            df["dollar_volume"]
+            .rolling(window=window, min_periods=max(5, window // 4))
+            .median()
+            .shift(1)
+        )
+
+        df["abs_bar_return"] = df[price_col].pct_change().abs()
+
+        # Safe feature if you want the model to know liquidity context.
+        df["liquidity_dollar_volume_log"] = np.log1p(
+            df["rolling_dollar_volume"].clip(lower=0)
+        )
+
+        return df
+
+    def _apply_liquidity_filters(self, df: pd.DataFrame, ticker: str, interval: str) -> pd.DataFrame:
+        df = df.copy()
+
+        price_col = "Adj Close" if "Adj Close" in df.columns else "Close"
+
+        min_dollar_volume = self._min_rolling_dollar_volume(interval)
+
+        before = len(df)
+
+        mask = (
+                df[price_col].between(self.config.min_price, self.config.max_price)
+                & (df["rolling_dollar_volume"] >= min_dollar_volume)
+                & (df["abs_bar_return"] <= self.config.max_abs_bar_return)
+        )
+
+        df = df[mask].copy()
+
+        after = len(df)
+        min_rows = self._min_rows_after_filter(interval)
+
+        if after < min_rows:
+            log(f"Skipping {ticker}: too few rows after liquidity filter ({after}/{before})", False)
+            return pd.DataFrame()
+
+        if after < before:
+            log(f"{ticker}: liquidity filter kept {after:,}/{before:,} rows", False)
+
+        return df
+
+    def evaluate_cost_sensitivity(self, base_df: pd.DataFrame, bps_values: tuple = (10.0, 25.0, 50.0, 100.0)) -> dict:
+        old_cost = self.config.cost_bps
+        results = {}
+
+        try:
+            for bps in bps_values:
+                self.config.cost_bps = bps
+                results[f"{bps:g}bps"] = self.evaluate_rotating_portfolio(base_df)
+        finally:
+            self.config.cost_bps = old_cost
+
+        return results
+
+    def evaluate_portfolio_by_year(self, base_df: pd.DataFrame) -> dict[str, dict[str, Any]]:
+        df = base_df.copy()
+        df["year"] = pd.to_datetime(df["Date"]).dt.year
+
+        results = {}
+
+        for year, year_df in df.groupby("year"):
+            unique_dates = year_df["Date"].nunique()
+
+            # Skip tiny partial years.
+            if unique_dates < 60:
+                continue
+
+            results[str(year)] = self.evaluate_rotating_portfolio(
+                year_df.drop(columns=["year"])
+            )
+
+        return results
+
+    def analyse_drawdown(self, base_df: pd.DataFrame) -> dict[str, Any]:
+        old_cost = self.config.cost_bps
+
+        df = base_df.copy()
+        df = df.sort_values(["ticker", "Date"])
+        df["next_return"] = df.groupby("ticker")["Adj Close"].shift(-1) / df["Adj Close"] - 1.0
+        df = df.sort_values(["Date", "ticker"])
+
+        dates = list(sorted(pd.to_datetime(df["Date"]).unique()))
+        by_date = {date: group.copy() for date, group in df.groupby("Date", sort=True)}
+
+        holdings = {}
+        daily_returns = []
+        daily_dates = []
+
+        cost = self.config.cost_bps / 10_000
+        max_positions = self.config.max_top_tickers
+        max_holding_days = self.config.horizon
+
+        for date in dates[:-1]:
+            day = by_date[date].copy()
+            day = day.dropna(subset=["pred", "next_return", "Adj Close"])
+
+            if day.empty:
+                continue
+
+            exit_signal_day = self.add_cross_sectional_signals(
+                day,
+                "pred",
+                ["Date", "profile_group"],
+                allow_short=True,
+            ).set_index("ticker", drop=False)
+
+            candidates = self._daily_candidate_pool(day)
+            turnover = 0
+
+            for ticker in list(holdings.keys()):
+                if ticker not in exit_signal_day.index:
+                    holdings.pop(ticker)
+                    turnover += 1
+                    continue
+
+                row = exit_signal_day.loc[ticker]
+                side = holdings[ticker]["side"]
+                age = holdings[ticker]["age"]
+
+                opposite_signal = row["pred_signal"] == -side
+                weak_long = side == 1 and row["pred"] <= self.config.exit_pred_threshold
+                too_old = age >= max_holding_days
+
+                if opposite_signal or weak_long or too_old:
+                    holdings.pop(ticker)
+                    turnover += 1
+
+            for _, row in candidates.iterrows():
+                ticker = row["ticker"]
+                side = int(row["pred_signal"])
+                score = float(row["score"])
+
+                if ticker in holdings:
+                    holdings[ticker]["score"] = score
+                    holdings[ticker]["side"] = side
+                    continue
+
+                if len(holdings) < max_positions:
+                    holdings[ticker] = {"side": side, "score": score, "age": 0}
+                    turnover += 1
+                    continue
+
+                weakest_ticker = min(holdings, key=lambda t: holdings[t]["score"])
+                weakest_score = holdings[weakest_ticker]["score"]
+
+                if score > weakest_score + self.config.replace_buffer:
+                    holdings.pop(weakest_ticker)
+                    holdings[ticker] = {"side": side, "score": score, "age": 0}
+                    turnover += 2
+
+            day_indexed = day.set_index("ticker", drop=False)
+            position_returns = []
+
+            for ticker, info in holdings.items():
+                if ticker not in day_indexed.index:
+                    continue
+
+                next_return = day_indexed.loc[ticker, "next_return"]
+                if np.isfinite(next_return):
+                    position_returns.append(info["side"] * float(next_return))
+
+            gross_return = float(np.mean(position_returns)) if position_returns else 0.0
+            turnover_cost = cost * turnover / max(1, max_positions)
+            portfolio_return = gross_return - turnover_cost
+
+            daily_dates.append(date)
+            daily_returns.append(portfolio_return)
+
+            for info in holdings.values():
+                info["age"] += 1
+
+        returns = pd.Series(daily_returns, index=pd.to_datetime(daily_dates), dtype=float)
+        equity = (1.0 + returns).cumprod()
+        running_peak = equity.cummax()
+        drawdown = equity / running_peak - 1.0
+
+        trough_date = drawdown.idxmin()
+        peak_date = equity.loc[:trough_date].idxmax()
+
+        return {
+            "max_drawdown": float(drawdown.min()),
+            "peak_date": str(peak_date.date()),
+            "trough_date": str(trough_date.date()),
+            "peak_equity": float(equity.loc[peak_date]),
+            "trough_equity": float(equity.loc[trough_date]),
+        }
+
+    def benchmark_drawdown(self, interval: str, start_date, end_date) -> dict[str, Any]:
+        spy = pd.read_parquet(os.path.join(DATA_DIR, f"SPY_{interval}.parquet"))
+        spy.index = pd.to_datetime(spy.index, utc=True).tz_localize(None)
+        spy = spy.loc[(spy.index >= start_date) & (spy.index <= end_date)].copy()
+
+        if spy.empty or len(spy) < 2:
+            return {
+                "spy_total_return": 0.0,
+                "spy_max_drawdown": 0.0,
+            }
+
+        returns = spy["Adj Close"].pct_change().dropna()
+        equity = (1.0 + returns).cumprod()
+        drawdown = equity / equity.cummax() - 1.0
+
+        return {
+            "spy_total_return": float(equity.iloc[-1] - 1.0),
+            "spy_max_drawdown": float(drawdown.min()),
+        }
+
+    def _rolling_vol_window(self, interval: str) -> int:
+        if interval == "1h":
+            return self.config.rolling_vol_window_1h
+        return self.config.rolling_vol_window_1d
+
+    def _rolling_beta_window(self, interval: str) -> int:
+        if interval == "1h":
+            return self.config.rolling_beta_window_1h
+        return self.config.rolling_beta_window_1d
+
+    def _rolling_annualiser(self, interval: str) -> float:
+        if interval == "1h":
+            return np.sqrt(252 * 6.5)
+        return np.sqrt(252)
+
+    def _add_rolling_risk_columns(self, df: pd.DataFrame, benchmark_close: pd.Series, interval: str) -> pd.DataFrame:
+        df = df.copy()
+
+        price_col = "Adj Close" if "Adj Close" in df.columns else "Close"
+
+        vol_window = self._rolling_vol_window(interval)
+        beta_window = self._rolling_beta_window(interval)
+        annualiser = self._rolling_annualiser(interval)
+
+        close = df[price_col].astype(float)
+        stock_ret = close.pct_change()
+
+        benchmark_close = benchmark_close.reindex(df.index).ffill()
+        benchmark_ret = benchmark_close.pct_change()
+
+        min_vol_periods = max(10, vol_window // 4)
+        min_beta_periods = max(20, beta_window // 4)
+
+        df["rolling_vol"] = (
+                stock_ret
+                .rolling(window=vol_window, min_periods=min_vol_periods)
+                .std()
+                .shift(1)
+                * annualiser
+        )
+
+        rolling_cov = (
+            stock_ret
+            .rolling(window=beta_window, min_periods=min_beta_periods)
+            .cov(benchmark_ret)
+            .shift(1)
+        )
+
+        rolling_market_var = (
+            benchmark_ret
+            .rolling(window=beta_window, min_periods=min_beta_periods)
+            .var()
+            .shift(1)
+        )
+
+        df["rolling_beta"] = rolling_cov / (rolling_market_var + 1e-12)
+        df["rolling_beta"] = df["rolling_beta"].replace([np.inf, -np.inf], np.nan)
+        df["rolling_beta"] = df["rolling_beta"].clip(-3.0, 3.0)
+
+        df["rolling_market_corr"] = (
+            stock_ret
+            .rolling(window=beta_window, min_periods=min_beta_periods)
+            .corr(benchmark_ret)
+            .shift(1)
+        )
+
+        df["rolling_market_vol"] = (
+                benchmark_ret
+                .rolling(window=vol_window, min_periods=min_vol_periods)
+                .std()
+                .shift(1)
+                * annualiser
+        )
+
+        return df
+
+########################################################################################################################
+
+    def add_forward_excess_target(self, df: pd.DataFrame, benchmark_close: pd.Series, beta: float | pd.Series = 1.0) -> pd.DataFrame:
         df = df.copy()
 
         close = df["Adj Close"]
         benchmark_close = benchmark_close.reindex(df.index).ffill()
 
-        beta = 1.0 if not np.isfinite(beta) else float(beta)
+        df["future_return"] = close.shift(-self.config.horizon) / close - 1.0
+        df["benchmark_future_return"] = benchmark_close.shift(-self.config.horizon) / benchmark_close - 1.0
 
-        df["future_return"] = close.shift(-horizon) / close - 1.0
-        df["benchmark_future_return"] = benchmark_close.shift(-horizon) / benchmark_close - 1.0
-        df["target_excess_return"] = df["future_return"] - beta * df["benchmark_future_return"]
+        if isinstance(beta, pd.Series):
+            beta_used = beta.reindex(df.index).ffill()
+            beta_used = beta_used.replace([np.inf, -np.inf], np.nan).fillna(1.0)
+        else:
+            beta_used = 1.0 if not np.isfinite(beta) else float(beta)
+
+        df["target_beta_used"] = beta_used
+        df["target_excess_return"] = df["future_return"] - beta_used * df["benchmark_future_return"]
 
         return df.dropna(subset=["target_excess_return"])
 
@@ -420,16 +769,25 @@ class TrainingManager:
                     log(f"Skipping {ticker}: no data")
                     continue
 
-                beta = ticker_map.get(ticker, {}).get("beta", np.nan)
+                meta = ticker_map.get(ticker, {})
+                if not self._passes_static_liquidity_filter(ticker, meta): continue
+
                 df = raw.ind.add_indicators(ticker, interval, add_targets=False)
-                df = self.add_forward_excess_target(df, benchmark_close, self.config.horizon, beta)
+
+                df = self._add_liquidity_columns(df, interval)
+                df = self._add_rolling_risk_columns(df, benchmark_close, interval)
+
+                df = self.add_forward_excess_target(df, benchmark_close, df["rolling_beta"])
 
                 df["ticker"] = ticker
                 df["profile"] = "All"
-                df["profile_vol"] = ticker_map.get(ticker, {}).get("vol", np.nan)
-                df["profile_beta"] = beta
-                df["profile_adv_log"] = np.log1p(ticker_map.get(ticker, {}).get("adv", np.nan))
+                df["profile_vol"] = df["rolling_vol"]
+                df["profile_beta"] = df["rolling_beta"]
+                df["profile_adv_log"] = df["liquidity_dollar_volume_log"]
                 df["Date"] = df.index
+
+                df = self._apply_liquidity_filters(df, ticker, interval)
+                if df.empty: continue
 
                 df = df.reset_index(drop=True)
                 frames.append(df)
@@ -451,15 +809,16 @@ class TrainingManager:
         data = data.copy()
         data["profile_group"] = data["profile"]
 
-        ticker_risk = data[["ticker", "profile_vol"]].drop_duplicates("ticker").dropna(subset=["profile_vol"]).copy()
+        # Dynamic risk buckets: each date ranks stocks by their rolling volatility.
+        rank_pct = data.groupby("Date")["profile_vol"].rank(method="first", pct=True)
 
-        ticker_risk["risk_bucket"] = pd.qcut(
-            ticker_risk["profile_vol"].rank(method="first"),
-            q=5,
-            labels=["vol_1", "vol_2", "vol_3", "vol_4", "vol_5"]
+        data["risk_bucket"] = pd.cut(
+            rank_pct,
+            bins=[0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
+            labels=["vol_1", "vol_2", "vol_3", "vol_4", "vol_5"],
+            include_lowest=True,
         )
 
-        data = data.merge(ticker_risk[["ticker", "risk_bucket"]], on="ticker", how="left")
         data["risk_bucket"] = data["risk_bucket"].astype(str).fillna("unknown")
         data["profile_group"] = data["risk_bucket"]
 
@@ -473,6 +832,7 @@ class TrainingManager:
             "future_return", "benchmark_future_return", "target_excess_return",
             "target_profit", "tbm_return", "barrier_strength",
             "time_to_gain", "time_to_loss", "tp_return", "sl_return",
+            "dollar_volume", "rolling_dollar_volume", "abs_bar_return", "target_beta_used"
         }
 
         self.feature_cols = [
@@ -808,6 +1168,21 @@ class TrainingManager:
         scored_df = self._apply_signals(base_df)
         strategy_metrics = self.evaluate_strategy(scored_df)
         portfolio_metrics = self.evaluate_rotating_portfolio(base_df)
+        cost_sensitivity = self.evaluate_cost_sensitivity(base_df)
+        yearly_portfolio = self.evaluate_portfolio_by_year(base_df)
+
+        drawdown_info = self.analyse_drawdown(base_df)
+        benchmark_dd = self.benchmark_drawdown(
+            interval,
+            drawdown_info["peak_date"],
+            drawdown_info["trough_date"],
+        )
+
+        drawdown_info["benchmark"] = benchmark_dd
+        drawdown_info["model_type"] = "LGBM"
+
+        log(f"{drawdown_info.get('model_type', 'Model')} drawdown analysis:")
+        log(json.dumps(drawdown_info, indent=4))
 
         return {
             "type": "LGBM",
@@ -818,17 +1193,23 @@ class TrainingManager:
             "rmse": float(mean_squared_error(self.y_test, pred) ** 0.5),
             **strategy_metrics,
             "portfolio": portfolio_metrics,
+            "yearly_portfolio": yearly_portfolio,
+            "cost_sensitivity": cost_sensitivity,
+            "drawdown_analysis": drawdown_info,
         }
 
     def _train_catboost(self, interval: str) -> dict:
         with open(os.path.join(ROOT_DIR, "results", f"cat_params_{interval}.json"), "r") as f:
             params = json.load(f)
 
-        if Settings.GPU["LGBM"]:
-            params.update({"device_type": "gpu", "gpu_platform_id": 0, "gpu_device_id": 0})
         if Settings.Threaded:
-            params.update({"num_threads": -1, "n_jobs": -1})
-        params.update({"objective": "regression"})
+            params.update({"thread_count": -1})
+
+        params.update({
+            "loss_function": "RMSE",
+            "allow_writing_files": False,
+            "task_type": "GPU" if Settings.GPU["CAT"] else "CPU",
+        })
 
         model = CatBoostRegressor(random_seed=self.seed, verbose=False, **params)
         model.fit(self.X_train, self.y_train)
@@ -841,6 +1222,21 @@ class TrainingManager:
         scored_df = self._apply_signals(base_df)
         strategy_metrics = self.evaluate_strategy(scored_df)
         portfolio_metrics = self.evaluate_rotating_portfolio(base_df)
+        yearly_portfolio = self.evaluate_portfolio_by_year(base_df)
+        cost_sensitivity = self.evaluate_cost_sensitivity(base_df)
+
+        drawdown_info = self.analyse_drawdown(base_df)
+        benchmark_dd = self.benchmark_drawdown(
+            interval,
+            drawdown_info["peak_date"],
+            drawdown_info["trough_date"],
+        )
+
+        drawdown_info["model_type"] = "CAT"
+        drawdown_info["benchmark"] = benchmark_dd
+
+        log("CAT drawdown analysis:")
+        log(json.dumps(drawdown_info, indent=4))
 
         return {
             "type": "CAT",
@@ -851,10 +1247,13 @@ class TrainingManager:
             "rmse": float(mean_squared_error(self.y_test, pred) ** 0.5),
             **strategy_metrics,
             "portfolio": portfolio_metrics,
+            "yearly_portfolio": yearly_portfolio,
+            "cost_sensitivity": cost_sensitivity,
+            "drawdown_analysis": drawdown_info,
         }
 
-    def _save_model_assets(self, interval, results: dict, baselines: dict):
-        save_folder = Path(os.path.join(MODEL_DIR, f"Profile ({interval}) ({self.config.horizon})"))
+    def _save_model_assets(self, interval: str, results: dict, baselines: dict):
+        save_folder = Path(os.path.join(MODEL_DIR, f"{interval} Model"))
         save_folder.mkdir(parents=True, exist_ok=True)
 
         metadata = {
@@ -899,7 +1298,7 @@ class TrainingManager:
             return latest
         return pd.concat([top, bottom], axis=0)
 
-    def run_training_pipeline(self, interval, force_train: bool = True) -> bool:
+    def run_training_pipeline(self, interval: str, force_train: bool = True) -> bool:
         def log_update(msg):
             if Settings.LOGGING:
                 log(msg)
@@ -911,7 +1310,7 @@ class TrainingManager:
             self.config.horizon = 30
             self.config.max_top_tickers = 10
 
-        save_folder = os.path.join(MODEL_DIR, f"Profile ({interval})")
+        save_folder = os.path.join(MODEL_DIR, f"{interval} Model")
         if all_model_assets_exist(save_folder) and not force_train:
             log_update(f"Universe model already trained: {save_folder}")
             return True
@@ -943,10 +1342,18 @@ class TrainingManager:
         log_update("Saving assets...")
         self._save_model_assets(interval, results, baselines)
 
-        best_model_type = max(results, key=lambda m: results[m].get("sharpe_like", -999))
-        latest = self.rank_latest_predictions(results[best_model_type]["test_df"])
+        def final_model_score(result: dict) -> float:
+            p = result["portfolio"]
+            return (
+                    p["portfolio_cagr_like"]
+                    + 0.05 * p["portfolio_sharpe_like"]
+                    - 0.50 * abs(p["portfolio_max_drawdown"])
+                    - 0.002 * p["portfolio_avg_turnover"]
+            )
+        best_model_type = max(results, key=lambda m: final_model_score(results[m]))
+        log(f"Best model: {best_model_type}")
 
-        log(f"Best model by sharpe_like: {best_model_type}")
+        latest = self.rank_latest_predictions(results[best_model_type]["test_df"])
         log("Latest ranked predictions:")
         log(latest.to_string(index=False))
 

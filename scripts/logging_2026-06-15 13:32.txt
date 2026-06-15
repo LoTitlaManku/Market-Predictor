@@ -1,0 +1,1491 @@
+Skipping A: profile ADV too low (1,979,702)
+AA: liquidity filter kept 8,266/8,336 rows
+Skipping AAAU: profile ADV too low (3,022,202)
+AAL: liquidity filter kept 4,549/4,895 rows
+AAOI: liquidity filter kept 1,243/2,882 rows
+Skipping AAP: profile ADV too low (2,130,448)
+AAPL: liquidity filter kept 4,300/8,336 rows
+ABBV: liquidity filter kept 3,062/3,067 rows
+Skipping ABNB: profile ADV too low (4,661,248)
+ABT: liquidity filter kept 7,437/8,336 rows
+Skipping ACGL: profile ADV too low (2,098,562)
+ACHR: liquidity filter kept 464/1,061 rows
+ACI: liquidity filter kept 1,162/1,183 rows
+Skipping ACLX: profile ADV too low (1,145,372)
+Skipping ACM: profile ADV too low (1,158,421)
+Skipping ACN: profile ADV too low (4,868,146)
+Skipping ADBE: profile ADV too low (4,581,810)
+Skipping ADI: profile ADV too low (3,705,890)
+Skipping ADM: profile ADV too low (3,640,282)
+Skipping ADP: profile ADV too low (2,389,875)
+Skipping ADSK: profile ADV too low (1,746,332)
+Skipping AEE: profile ADV too low (1,670,958)
+Skipping AEIS: profile ADV too low (510,029)
+Skipping AEM: profile ADV too low (2,774,494)
+AEO: liquidity filter kept 5,688/7,780 rows
+Skipping AEP: profile ADV too low (3,290,017)
+Skipping AER: profile ADV too low (1,358,196)
+AES: liquidity filter kept 6,608/8,316 rows
+Skipping AFL: profile ADV too low (2,341,110)
+AFRM: liquidity filter kept 1,040/1,045 rows
+AG: liquidity filter kept 3,229/4,600 rows
+Skipping AGCO: profile ADV too low (772,296)
+Skipping AGI: profile ADV too low (3,643,944)
+AGNC: liquidity filter kept 3,179/4,233 rows
+Skipping AGX: profile ADV too low (408,209)
+Skipping AIG: profile ADV too low (4,441,996)
+Skipping AJG: profile ADV too low (1,764,817)
+Skipping AKAM: profile ADV too low (3,277,387)
+Skipping ALB: profile ADV too low (3,413,068)
+Skipping ALC: profile ADV too low (1,843,975)
+Skipping ALGM: profile ADV too low (2,152,818)
+Skipping ALGN: profile ADV too low (1,270,400)
+Skipping ALK: profile ADV too low (3,455,338)
+Skipping ALL: profile ADV too low (1,521,869)
+Skipping ALLE: profile ADV too low (904,995)
+Skipping ALLY: profile ADV too low (3,491,585)
+Skipping ALNY: profile ADV too low (1,198,767)
+Skipping ALSN: profile ADV too low (886,226)
+AMAT: liquidity filter kept 7,229/8,336 rows
+AMD: liquidity filter kept 7,006/8,336 rows
+Skipping AME: profile ADV too low (1,333,138)
+Skipping AMG: profile ADV too low (305,867)
+Skipping AMGN: profile ADV too low (2,633,008)
+Skipping AMH: profile ADV too low (3,022,804)
+Skipping AMKR: profile ADV too low (3,258,154)
+Skipping AMP: profile ADV too low (577,388)
+Skipping AMPX: too few rows after liquidity filter (172/624)
+AMZN: liquidity filter kept 4,127/7,000 rows
+Skipping AN: profile ADV too low (433,224)
+ANET: liquidity filter kept 2,433/2,708 rows
+Skipping ANF: profile ADV too low (1,979,410)
+Skipping AON: profile ADV too low (1,289,855)
+Skipping AOS: profile ADV too low (1,419,173)
+APA: liquidity filter kept 6,983/8,336 rows
+Skipping APD: profile ADV too low (1,271,757)
+Skipping APG: profile ADV too low (2,985,163)
+APH: liquidity filter kept 3,938/8,336 rows
+APLD: liquidity filter kept 531/730 rows
+Skipping APO: profile ADV too low (3,842,888)
+APP: liquidity filter kept 977/982 rows
+Skipping APTV: profile ADV too low (2,398,055)
+AR: liquidity filter kept 2,508/2,872 rows
+ARCC: liquidity filter kept 2,675/5,142 rows
+Skipping ARE: profile ADV too low (2,254,823)
+Skipping ARES: profile ADV too low (2,657,120)
+Skipping ARGX: profile ADV too low (375,469)
+Skipping ARKB: profile ADV too low (3,906,077)
+Skipping ARMK: profile ADV too low (2,385,105)
+Skipping ARW: profile ADV too low (557,824)
+Skipping ASML: profile ADV too low (1,657,562)
+Skipping ASND: profile ADV too low (574,073)
+ASTS: liquidity filter kept 696/1,346 rows
+ASX: liquidity filter kept 1,216/6,147 rows
+Skipping ATI: profile ADV too low (1,832,777)
+Skipping ATO: profile ADV too low (1,022,746)
+Skipping AU: profile ADV too low (3,122,570)
+Skipping AVAV: profile ADV too low (1,334,285)
+Skipping AVB: profile ADV too low (974,508)
+AVGO: liquidity filter kept 2,980/3,924 rows
+AVTR: liquidity filter kept 1,458/1,463 rows
+Skipping AVY: profile ADV too low (679,117)
+Skipping AWI: profile ADV too low (394,571)
+Skipping AWK: profile ADV too low (1,609,398)
+Skipping AXON: profile ADV too low (828,122)
+Skipping AXP: profile ADV too low (2,932,802)
+Skipping AXTA: profile ADV too low (3,235,702)
+Skipping AXTI: profile ADV too low (4,894,907)
+Skipping AYI: profile ADV too low (338,419)
+Skipping AZN: profile ADV too low (2,511,046)
+Skipping AZO: profile ADV too low (149,304)
+B: liquidity filter kept 8,232/8,336 rows
+BABA: liquidity filter kept 2,630/2,635 rows
+BAC: liquidity filter kept 8,102/8,336 rows
+Skipping BAH: profile ADV too low (2,163,669)
+Skipping BALL: profile ADV too low (2,538,464)
+Skipping BAM: profile ADV too low (2,722,319)
+Skipping BAP: profile ADV too low (370,042)
+BAX: liquidity filter kept 7,652/8,336 rows
+Skipping BBIO: profile ADV too low (2,616,776)
+Skipping BBY: profile ADV too low (3,961,840)
+BCS: liquidity filter kept 4,608/8,252 rows
+Skipping BDX: profile ADV too low (2,976,221)
+BE: liquidity filter kept 1,585/1,667 rows
+Skipping BEN: profile ADV too low (4,724,433)
+Skipping BF-B: profile ADV too low (4,807,723)
+Skipping BG: profile ADV too low (1,791,227)
+Skipping BHP: profile ADV too low (3,306,287)
+Skipping BIDU: profile ADV too low (3,657,067)
+Skipping BIIB: profile ADV too low (1,558,983)
+Skipping BILL: profile ADV too low (2,728,698)
+Skipping BITB: profile ADV too low (2,383,648)
+Skipping BJ: profile ADV too low (2,011,460)
+Skipping BK: profile ADV too low (3,700,829)
+BKNG: liquidity filter kept 4,336/6,528 rows
+BKR: liquidity filter kept 7,443/8,336 rows
+Skipping BLD: profile ADV too low (412,321)
+Skipping BLDR: profile ADV too low (2,195,902)
+Skipping BLK: profile ADV too low (675,016)
+Skipping BMO: profile ADV too low (715,847)
+Skipping BMRN: profile ADV too low (2,315,224)
+BMY: liquidity filter kept 7,796/8,336 rows
+Skipping BN: profile ADV too low (4,372,499)
+Skipping BNO: profile ADV too low (2,012,258)
+Skipping BNTX: profile ADV too low (1,008,973)
+Skipping BOOT: profile ADV too low (642,241)
+BP: liquidity filter kept 7,266/8,336 rows
+Skipping BR: profile ADV too low (923,724)
+Skipping BRO: profile ADV too low (3,143,310)
+Skipping BROS: profile ADV too low (3,974,615)
+BSX: liquidity filter kept 7,749/8,262 rows
+Skipping BSY: profile ADV too low (2,250,487)
+Skipping BTI: profile ADV too low (4,841,590)
+Skipping BURL: profile ADV too low (941,960)
+Skipping BWA: profile ADV too low (2,632,672)
+Skipping BWXT: profile ADV too low (1,161,814)
+BX: liquidity filter kept 4,163/4,459 rows
+Skipping BXP: profile ADV too low (1,938,757)
+C: liquidity filter kept 8,195/8,336 rows
+Skipping CACC: profile ADV too low (159,956)
+Skipping CACI: profile ADV too low (266,990)
+CAG: liquidity filter kept 6,754/8,336 rows
+Skipping CAH: profile ADV too low (2,145,823)
+CARR: liquidity filter kept 1,247/1,252 rows
+Skipping CART: profile ADV too low (4,906,165)
+Skipping CASY: profile ADV too low (399,945)
+Skipping CAT: profile ADV too low (2,730,933)
+Skipping CAVA: profile ADV too low (3,965,176)
+Skipping CB: profile ADV too low (1,754,530)
+Skipping CBOE: profile ADV too low (837,627)
+Skipping CBRE: profile ADV too low (1,760,143)
+Skipping CCEP: profile ADV too low (1,781,407)
+Skipping CCI: profile ADV too low (3,178,787)
+Skipping CCJ: profile ADV too low (4,573,967)
+Skipping CCK: profile ADV too low (1,299,410)
+CCL: liquidity filter kept 7,117/8,336 rows
+CDE: liquidity filter kept 4,254/8,336 rows
+Skipping CDNS: profile ADV too low (2,036,923)
+Skipping CDW: profile ADV too low (1,507,661)
+Skipping CE: profile ADV too low (2,182,885)
+Skipping CEG: profile ADV too low (2,892,565)
+CELH: liquidity filter kept 1,407/4,565 rows
+Skipping CENX: profile ADV too low (1,993,054)
+Skipping CF: profile ADV too low (3,107,297)
+Skipping CFG: profile ADV too low (4,818,799)
+Skipping CG: profile ADV too low (2,921,480)
+Skipping CGNX: profile ADV too low (1,999,398)
+Skipping CHD: profile ADV too low (2,280,133)
+Skipping CHKP: profile ADV too low (1,051,533)
+Skipping CHRD: profile ADV too low (837,073)
+Skipping CHRW: profile ADV too low (1,719,633)
+Skipping CHTR: profile ADV too low (1,994,315)
+CHWY: liquidity filter kept 1,439/1,444 rows
+Skipping CIEN: profile ADV too low (2,759,565)
+CIFR: liquidity filter kept 275/1,103 rows
+Skipping CINF: profile ADV too low (609,785)
+CL: liquidity filter kept 7,571/8,336 rows
+CLF: liquidity filter kept 5,162/8,316 rows
+Skipping CLH: profile ADV too low (470,298)
+Skipping CLS: profile ADV too low (3,000,052)
+CLSK: liquidity filter kept 1,072/2,039 rows
+Skipping CM: profile ADV too low (1,222,362)
+CMCSA: liquidity filter kept 5,731/8,336 rows
+Skipping CME: profile ADV too low (2,135,335)
+CMG: liquidity filter kept 3,783/4,812 rows
+Skipping CMI: profile ADV too low (881,758)
+Skipping CMS: profile ADV too low (2,572,411)
+CNH: liquidity filter kept 2,204/2,880 rows
+Skipping CNI: profile ADV too low (1,560,628)
+Skipping CNM: profile ADV too low (2,414,923)
+CNP: liquidity filter kept 5,235/8,336 rows
+Skipping COF: profile ADV too low (4,379,015)
+Skipping COHR: profile ADV too low (4,929,013)
+COIN: liquidity filter kept 978/983 rows
+COMP: liquidity filter kept 415/976 rows
+Skipping COO: profile ADV too low (2,529,412)
+COP: liquidity filter kept 7,172/8,336 rows
+Skipping COR: profile ADV too low (1,448,838)
+Skipping COST: profile ADV too low (2,264,148)
+Skipping CP: profile ADV too low (2,794,029)
+Skipping CPAY: profile ADV too low (561,550)
+CPB: liquidity filter kept 6,520/8,336 rows
+CPNG: liquidity filter kept 1,001/1,006 rows
+CPRT: liquidity filter kept 2,517/7,799 rows
+Skipping CPT: profile ADV too low (1,138,187)
+Skipping CRBG: profile ADV too low (4,696,223)
+CRDO: liquidity filter kept 759/783 rows
+CRH: liquidity filter kept 2,424/8,185 rows
+Skipping CRL: profile ADV too low (933,434)
+CRM: liquidity filter kept 5,192/5,214 rows
+Skipping CRML: too few rows after liquidity filter (145/776)
+Skipping CROX: profile ADV too low (1,615,549)
+Skipping CRS: profile ADV too low (885,206)
+Skipping CRWD: profile ADV too low (3,228,018)
+Skipping CSGP: profile ADV too low (4,519,633)
+Skipping CSL: profile ADV too low (466,529)
+CSX: liquidity filter kept 3,934/8,336 rows
+Skipping CTAS: profile ADV too low (1,930,896)
+CTRA: liquidity filter kept 4,729/8,315 rows
+Skipping CTSH: profile ADV too low (4,970,210)
+Skipping CTVA: profile ADV too low (4,144,778)
+Skipping CVCO: profile ADV too low (167,542)
+CVE: liquidity filter kept 3,658/3,852 rows
+Skipping CVLT: profile ADV too low (802,287)
+Skipping CVNA: profile ADV too low (4,134,500)
+CVS: liquidity filter kept 7,414/8,336 rows
+CVX: liquidity filter kept 8,293/8,336 rows
+Skipping CW: profile ADV too low (290,064)
+Skipping CYTK: profile ADV too low (2,023,092)
+CZR: liquidity filter kept 2,215/2,634 rows
+D: liquidity filter kept 6,548/8,336 rows
+DAL: liquidity filter kept 4,423/4,494 rows
+Skipping DAR: profile ADV too low (2,567,475)
+Skipping DASH: profile ADV too low (4,440,752)
+Skipping DAVE: profile ADV too low (537,413)
+Skipping DB: profile ADV too low (2,816,544)
+Skipping DBX: profile ADV too low (3,641,338)
+DD: liquidity filter kept 7,824/8,336 rows
+DDOG: liquidity filter kept 1,372/1,377 rows
+Skipping DE: profile ADV too low (1,384,361)
+Skipping DECK: profile ADV too low (3,179,428)
+DELL: liquidity filter kept 2,149/2,154 rows
+Skipping DEO: profile ADV too low (1,519,467)
+Skipping DG: profile ADV too low (3,285,449)
+Skipping DGX: profile ADV too low (1,010,991)
+Skipping DHR: profile ADV too low (4,057,477)
+Skipping DINO: profile ADV too low (2,542,425)
+DKNG: liquidity filter kept 1,411/1,416 rows
+Skipping DKS: profile ADV too low (1,458,614)
+Skipping DLR: profile ADV too low (1,833,979)
+Skipping DLTR: profile ADV too low (3,735,374)
+DOC: liquidity filter kept 4,836/8,316 rows
+Skipping DOCN: profile ADV too low (2,945,970)
+Skipping DOCS: profile ADV too low (2,529,964)
+Skipping DOCU: profile ADV too low (3,514,720)
+Skipping DOV: profile ADV too low (1,112,091)
+Skipping DOX: profile ADV too low (997,758)
+Skipping DPZ: profile ADV too low (733,573)
+Skipping DRI: profile ADV too low (1,415,865)
+Skipping DT: profile ADV too low (4,384,653)
+Skipping DTE: profile ADV too low (1,378,812)
+Skipping DUK: profile ADV too low (3,473,648)
+Skipping DUOL: profile ADV too low (1,878,138)
+Skipping DVA: profile ADV too low (903,287)
+DVN: liquidity filter kept 6,571/8,276 rows
+Skipping DXCM: profile ADV too low (4,858,390)
+Skipping DY: profile ADV too low (405,618)
+Skipping EAT: profile ADV too low (1,362,251)
+EBAY: liquidity filter kept 6,373/6,657 rows
+Skipping ECL: profile ADV too low (1,352,681)
+Skipping ED: profile ADV too low (2,316,835)
+Skipping EFX: profile ADV too low (1,393,853)
+Skipping EG: profile ADV too low (373,603)
+Skipping EGO: profile ADV too low (2,275,257)
+Skipping EHC: profile ADV too low (930,397)
+Skipping EIX: profile ADV too low (3,339,307)
+Skipping EL: profile ADV too low (4,020,842)
+ELAN: liquidity filter kept 1,622/1,627 rows
+Skipping ELF: profile ADV too low (2,281,370)
+Skipping ELS: profile ADV too low (1,695,148)
+Skipping ELV: profile ADV too low (1,949,008)
+Skipping EME: profile ADV too low (448,254)
+Skipping EMN: profile ADV too low (1,816,143)
+Skipping EMR: profile ADV too low (3,032,753)
+Skipping ENB: profile ADV too low (4,213,140)
+ENPH: liquidity filter kept 1,908/3,256 rows
+Skipping ENTG: profile ADV too low (2,901,178)
+Skipping EOG: profile ADV too low (4,077,990)
+Skipping EOSE: too few rows after liquidity filter (223/1094)
+Skipping EPAM: profile ADV too low (989,275)
+Skipping EPD: profile ADV too low (4,209,903)
+Skipping EQH: profile ADV too low (3,045,419)
+Skipping EQIX: profile ADV too low (576,561)
+Skipping EQNR: profile ADV too low (4,866,641)
+Skipping EQR: profile ADV too low (2,358,790)
+EQT: liquidity filter kept 5,456/8,336 rows
+EQX: liquidity filter kept 980/1,557 rows
+Skipping ES: profile ADV too low (2,583,256)
+Skipping ESI: profile ADV too low (2,397,312)
+Skipping ESLT: profile ADV too low (136,632)
+Skipping ESS: profile ADV too low (492,490)
+Skipping ESTC: profile ADV too low (1,909,511)
+ET: liquidity filter kept 2,972/4,806 rows
+ETHE: liquidity filter kept 1,338/1,444 rows
+Skipping ETR: profile ADV too low (2,809,690)
+Skipping ETSY: profile ADV too low (4,599,731)
+Skipping EVR: profile ADV too low (510,822)
+Skipping EVRG: profile ADV too low (2,181,169)
+Skipping EW: profile ADV too low (4,418,414)
+Skipping EWBC: profile ADV too low (916,078)
+EXC: liquidity filter kept 6,660/8,336 rows
+Skipping EXE: profile ADV too low (3,438,791)
+Skipping EXEL: profile ADV too low (2,955,419)
+EXK: liquidity filter kept 770/4,750 rows
+Skipping EXPD: profile ADV too low (1,337,446)
+Skipping EXPE: profile ADV too low (2,077,650)
+Skipping EXR: profile ADV too low (1,188,029)
+F: liquidity filter kept 5,721/8,336 rows
+Skipping FANG: profile ADV too low (2,327,972)
+FAST: liquidity filter kept 3,832/8,336 rows
+Skipping FBIN: profile ADV too low (2,188,593)
+Skipping FBTC: profile ADV too low (4,991,223)
+Skipping FCNCA: profile ADV too low (106,202)
+FCX: liquidity filter kept 5,843/7,469 rows
+Skipping FDS: profile ADV too low (738,677)
+Skipping FDX: profile ADV too low (1,930,583)
+Skipping FE: profile ADV too low (4,612,992)
+Skipping FERG: profile ADV too low (1,529,069)
+Skipping FFIV: profile ADV too low (775,590)
+FHN: liquidity filter kept 5,743/8,336 rows
+Skipping FICO: profile ADV too low (324,677)
+Skipping FIS: profile ADV too low (4,215,465)
+FISV: liquidity filter kept 6,867/8,335 rows
+FITB: liquidity filter kept 6,934/8,336 rows
+Skipping FIVE: profile ADV too low (1,289,572)
+Skipping FIX: profile ADV too low (444,127)
+Skipping FLEX: profile ADV too low (4,339,432)
+FLNC: liquidity filter kept 774/845 rows
+Skipping FLR: profile ADV too low (3,442,362)
+Skipping FLS: profile ADV too low (2,086,169)
+Skipping FLUT: profile ADV too low (2,914,508)
+Skipping FN: profile ADV too low (655,607)
+FNB: liquidity filter kept 2,561/8,094 rows
+Skipping FND: profile ADV too low (2,396,006)
+Skipping FNV: profile ADV too low (803,841)
+Skipping FORM: profile ADV too low (1,136,146)
+Skipping FOUR: profile ADV too low (1,980,227)
+Skipping FRO: profile ADV too low (3,013,569)
+Skipping FROG: profile ADV too low (2,001,486)
+Skipping FRPT: profile ADV too low (1,403,234)
+Skipping FSLR: profile ADV too low (2,951,490)
+FSLY: liquidity filter kept 1,458/1,463 rows
+Skipping FTAI: profile ADV too low (1,452,566)
+Skipping FTI: profile ADV too low (4,168,321)
+Skipping FTV: profile ADV too low (3,718,551)
+Skipping FUTU: profile ADV too low (1,921,509)
+Skipping FWONK: profile ADV too low (1,505,681)
+Skipping G: profile ADV too low (2,036,985)
+GAP: liquidity filter kept 7,411/8,336 rows
+Skipping GBTC: profile ADV too low (3,643,835)
+Skipping GD: profile ADV too low (1,222,372)
+Skipping GDDY: profile ADV too low (1,759,787)
+Skipping GDS: profile ADV too low (2,115,778)
+Skipping GEHC: profile ADV too low (3,777,935)
+GEN: liquidity filter kept 5,547/8,336 rows
+Skipping GFI: profile ADV too low (3,342,318)
+Skipping GFS: profile ADV too low (3,322,453)
+Skipping GH: profile ADV too low (2,297,671)
+Skipping GIL: profile ADV too low (1,186,085)
+GILD: liquidity filter kept 5,613/8,336 rows
+GIS: liquidity filter kept 7,244/8,336 rows
+GLD: liquidity filter kept 5,105/5,110 rows
+Skipping GLPI: profile ADV too low (2,131,516)
+GLW: liquidity filter kept 7,083/8,336 rows
+GME: liquidity filter kept 2,659/5,807 rows
+Skipping GMED: profile ADV too low (1,484,317)
+Skipping GNRC: profile ADV too low (1,058,574)
+GOOG: liquidity filter kept 5,169/5,174 rows
+Skipping GPC: profile ADV too low (1,356,769)
+Skipping GPN: profile ADV too low (2,915,548)
+Skipping GRMN: profile ADV too low (907,752)
+Skipping GS: profile ADV too low (2,118,864)
+GTLB: liquidity filter kept 850/855 rows
+Skipping GWRE: profile ADV too low (1,091,951)
+Skipping GWW: profile ADV too low (283,559)
+Skipping H: profile ADV too low (914,757)
+HAL: liquidity filter kept 7,676/8,336 rows
+Skipping HALO: profile ADV too low (2,100,580)
+Skipping HAS: profile ADV too low (1,901,196)
+HBAN: liquidity filter kept 3,862/8,336 rows
+HBM: liquidity filter kept 666/4,044 rows
+Skipping HCA: profile ADV too low (1,277,896)
+Skipping HD: profile ADV too low (3,888,981)
+HDB: liquidity filter kept 4,199/5,946 rows
+Skipping HEI: profile ADV too low (485,434)
+Skipping HIG: profile ADV too low (1,527,342)
+Skipping HII: profile ADV too low (498,692)
+HIMS: liquidity filter kept 1,110/1,381 rows
+HL: liquidity filter kept 2,412/8,336 rows
+Skipping HLT: profile ADV too low (1,796,239)
+Skipping HMY: profile ADV too low (4,988,504)
+Skipping HON: profile ADV too low (4,066,616)
+HOOD: liquidity filter kept 904/909 rows
+HPE: liquidity filter kept 2,358/2,363 rows
+HPQ: liquidity filter kept 6,907/8,336 rows
+Skipping HRL: profile ADV too low (4,380,692)
+Skipping HSIC: profile ADV too low (1,507,323)
+Skipping HSY: profile ADV too low (1,777,431)
+Skipping HUBB: profile ADV too low (543,199)
+Skipping HUBS: profile ADV too low (1,155,033)
+Skipping HUM: profile ADV too low (1,839,077)
+HUT: liquidity filter kept 1,152/1,763 rows
+Skipping HWM: profile ADV too low (2,560,062)
+Skipping HXL: profile ADV too low (1,153,043)
+Skipping HYMC: profile ADV too low (2,330,653)
+IAG: liquidity filter kept 1,951/5,451 rows
+IAU: liquidity filter kept 4,758/5,062 rows
+Skipping IAUM: profile ADV too low (4,195,416)
+IBIT: liquidity filter kept 287/292 rows
+IBM: liquidity filter kept 8,310/8,336 rows
+Skipping IBP: profile ADV too low (399,442)
+Skipping ICE: profile ADV too low (3,300,696)
+Skipping ICLR: profile ADV too low (1,332,409)
+Skipping IDXX: profile ADV too low (537,971)
+Skipping IESC: profile ADV too low (173,643)
+Skipping IEX: profile ADV too low (728,891)
+Skipping ILMN: profile ADV too low (1,907,562)
+Skipping INCY: profile ADV too low (1,886,729)
+INFY: liquidity filter kept 3,404/6,542 rows
+Skipping INSM: profile ADV too low (2,904,571)
+INTC: liquidity filter kept 7,505/8,336 rows
+Skipping INTU: profile ADV too low (2,463,372)
+INVH: liquidity filter kept 2,034/2,039 rows
+IONQ: liquidity filter kept 932/1,052 rows
+Skipping IONS: profile ADV too low (2,194,757)
+IOT: liquidity filter kept 805/812 rows
+IP: liquidity filter kept 7,994/8,336 rows
+Skipping IQV: profile ADV too low (1,845,697)
+Skipping IR: profile ADV too low (3,289,039)
+IREN: liquidity filter kept 538/831 rows
+Skipping IRM: profile ADV too low (1,720,764)
+Skipping IRTC: profile ADV too low (515,730)
+Skipping ISRG: profile ADV too low (2,005,541)
+Skipping IT: profile ADV too low (1,286,361)
+Skipping ITRI: profile ADV too low (798,740)
+Skipping ITT: profile ADV too low (674,250)
+Skipping ITW: profile ADV too low (1,165,713)
+IVZ: liquidity filter kept 4,634/7,414 rows
+Skipping J: profile ADV too low (908,438)
+Skipping JAZZ: profile ADV too low (930,046)
+Skipping JBHT: profile ADV too low (1,134,310)
+Skipping JBL: profile ADV too low (1,311,942)
+Skipping JCI: profile ADV too low (4,636,759)
+JD: liquidity filter kept 2,713/2,718 rows
+Skipping JEF: profile ADV too low (2,259,081)
+Skipping JHX: too few rows after liquidity filter (234/5404)
+Skipping JKHY: profile ADV too low (855,787)
+Skipping JLL: profile ADV too low (430,462)
+JNJ: liquidity filter kept 8,059/8,336 rows
+JOBY: liquidity filter kept 825/1,089 rows
+JPM: liquidity filter kept 8,142/8,336 rows
+KDP: liquidity filter kept 2,946/4,239 rows
+KEY: liquidity filter kept 5,998/8,336 rows
+Skipping KEYS: profile ADV too low (1,157,144)
+KGC: liquidity filter kept 3,206/8,336 rows
+KHC: liquidity filter kept 2,432/2,437 rows
+Skipping KIM: profile ADV too low (4,747,508)
+Skipping KKR: profile ADV too low (4,970,004)
+Skipping KLAC: profile ADV too low (1,048,169)
+Skipping KMB: profile ADV too low (4,223,551)
+KMI: liquidity filter kept 3,536/3,541 rows
+Skipping KMX: profile ADV too low (3,964,513)
+Skipping KNX: profile ADV too low (3,155,838)
+KO: liquidity filter kept 7,951/8,336 rows
+KR: liquidity filter kept 7,126/8,336 rows
+Skipping KTOS: profile ADV too low (3,918,513)
+KVUE: liquidity filter kept 460/465 rows
+Skipping KVYO: profile ADV too low (3,349,237)
+Skipping LAD: profile ADV too low (300,137)
+Skipping LASR: profile ADV too low (1,085,724)
+Skipping LBRT: profile ADV too low (4,153,492)
+Skipping LDOS: profile ADV too low (985,595)
+Skipping LECO: profile ADV too low (355,017)
+Skipping LEN: profile ADV too low (3,851,161)
+Skipping LEU: profile ADV too low (1,233,248)
+Skipping LFUS: profile ADV too low (213,672)
+Skipping LH: profile ADV too low (702,168)
+Skipping LHX: profile ADV too low (1,337,371)
+Skipping LII: profile ADV too low (437,033)
+Skipping LIN: profile ADV too low (2,245,560)
+Skipping LITE: profile ADV too low (4,266,009)
+Skipping LLY: profile ADV too low (3,730,109)
+Skipping LMND: profile ADV too low (2,518,806)
+Skipping LMT: profile ADV too low (1,589,375)
+Skipping LNG: profile ADV too low (2,170,661)
+Skipping LNT: profile ADV too low (2,166,509)
+Skipping LOGI: profile ADV too low (816,610)
+Skipping LOW: profile ADV too low (2,812,341)
+Skipping LPLA: profile ADV too low (835,404)
+Skipping LPX: profile ADV too low (961,805)
+LRCX: liquidity filter kept 2,975/8,336 rows
+Skipping LRN: profile ADV too low (1,125,392)
+Skipping LSCC: profile ADV too low (2,169,801)
+Skipping LULU: profile ADV too low (3,781,069)
+LUMN: liquidity filter kept 4,361/8,336 rows
+LUNR: liquidity filter kept 471/831 rows
+LUV: liquidity filter kept 7,314/8,336 rows
+LVS: liquidity filter kept 4,952/5,092 rows
+Skipping LW: profile ADV too low (2,351,846)
+LYB: liquidity filter kept 3,737/3,742 rows
+LYFT: liquidity filter kept 1,492/1,497 rows
+Skipping LYV: profile ADV too low (2,778,240)
+M: liquidity filter kept 7,653/8,334 rows
+Skipping MA: profile ADV too low (3,094,206)
+Skipping MAA: profile ADV too low (955,658)
+Skipping MAR: profile ADV too low (1,505,719)
+MARA: liquidity filter kept 1,332/3,232 rows
+Skipping MAS: profile ADV too low (2,493,121)
+Skipping MASI: profile ADV too low (949,098)
+Skipping MAT: profile ADV too low (4,268,485)
+MCHP: liquidity filter kept 6,471/8,051 rows
+Skipping MCK: profile ADV too low (796,639)
+Skipping MCO: profile ADV too low (927,178)
+Skipping MDB: profile ADV too low (2,175,749)
+Skipping MDGL: profile ADV too low (348,587)
+MDLZ: liquidity filter kept 5,961/5,972 rows
+MDT: liquidity filter kept 7,798/8,336 rows
+Skipping MEDP: profile ADV too low (374,740)
+Skipping MELI: profile ADV too low (473,709)
+Skipping MET: profile ADV too low (3,419,116)
+META: liquidity filter kept 3,217/3,222 rows
+Skipping MFC: profile ADV too low (2,165,721)
+Skipping MGA: profile ADV too low (1,645,517)
+Skipping MGM: profile ADV too low (4,742,217)
+Skipping MHK: profile ADV too low (916,677)
+Skipping MKC: profile ADV too low (3,115,699)
+Skipping MKSI: profile ADV too low (1,174,454)
+Skipping MLI: profile ADV too low (890,153)
+Skipping MLM: profile ADV too low (434,113)
+Skipping MMM: profile ADV too low (3,412,096)
+Skipping MMYT: profile ADV too low (1,347,744)
+Skipping MNDY: profile ADV too low (1,457,792)
+MNST: liquidity filter kept 3,782/8,336 rows
+MO: liquidity filter kept 5,039/8,336 rows
+Skipping MOD: profile ADV too low (1,102,241)
+Skipping MOH: profile ADV too low (1,526,206)
+Skipping MORN: profile ADV too low (423,910)
+MOS: liquidity filter kept 5,462/8,336 rows
+MP: liquidity filter kept 1,182/1,187 rows
+Skipping MPC: profile ADV too low (2,263,117)
+Skipping MPLX: profile ADV too low (1,587,385)
+Skipping MPWR: profile ADV too low (612,846)
+MRK: liquidity filter kept 8,240/8,336 rows
+MRNA: liquidity filter kept 1,568/1,573 rows
+MRVL: liquidity filter kept 5,951/6,211 rows
+MS: liquidity filter kept 7,547/8,069 rows
+Skipping MSCI: profile ADV too low (635,421)
+MSFT: liquidity filter kept 7,419/8,336 rows
+Skipping MSI: profile ADV too low (1,087,139)
+MSTR: liquidity filter kept 4,492/6,730 rows
+Skipping MTB: profile ADV too low (1,118,747)
+Skipping MTCH: profile ADV too low (4,403,940)
+Skipping MTD: profile ADV too low (155,079)
+Skipping MTN: profile ADV too low (804,276)
+Skipping MTSI: profile ADV too low (1,042,402)
+Skipping MTZ: profile ADV too low (911,608)
+MU: liquidity filter kept 7,902/8,336 rows
+Skipping MUSA: profile ADV too low (332,815)
+Skipping NBIX: profile ADV too low (1,036,312)
+NCLH: liquidity filter kept 3,050/3,055 rows
+Skipping NDAQ: profile ADV too low (3,687,366)
+Skipping NDSN: profile ADV too low (380,052)
+Skipping NE: profile ADV too low (2,113,447)
+NEE: liquidity filter kept 5,319/8,336 rows
+NEM: liquidity filter kept 7,936/8,336 rows
+Skipping NET: profile ADV too low (3,534,881)
+Skipping NEU: profile ADV too low (115,294)
+NFLX: liquidity filter kept 3,023/5,738 rows
+Skipping NI: profile ADV too low (4,201,418)
+Skipping NICE: profile ADV too low (700,441)
+NKE: liquidity filter kept 6,239/8,336 rows
+NLY: liquidity filter kept 4,560/6,899 rows
+Skipping NOC: profile ADV too low (822,764)
+NOW: liquidity filter kept 3,188/3,193 rows
+Skipping NSC: profile ADV too low (1,527,747)
+Skipping NTES: profile ADV too low (780,115)
+Skipping NTNX: profile ADV too low (3,816,651)
+Skipping NTR: profile ADV too low (2,764,696)
+Skipping NTRA: profile ADV too low (1,312,822)
+Skipping NTRS: profile ADV too low (1,306,418)
+NU: liquidity filter kept 726/816 rows
+Skipping NUE: profile ADV too low (1,743,784)
+NVDA: liquidity filter kept 1,836/6,575 rows
+Skipping NVMI: profile ADV too low (352,287)
+NVO: liquidity filter kept 4,025/8,144 rows
+Skipping NVT: profile ADV too low (2,137,656)
+NVTS: liquidity filter kept 385/851 rows
+Skipping NWSA: profile ADV too low (3,875,329)
+Skipping NXPI: profile ADV too low (2,834,306)
+Skipping NXT: profile ADV too low (2,250,631)
+Skipping NYT: profile ADV too low (1,918,335)
+Skipping OC: profile ADV too low (1,238,713)
+Skipping ODFL: profile ADV too low (2,091,736)
+Skipping OKE: profile ADV too low (4,185,503)
+OKLO: liquidity filter kept 482/924 rows
+Skipping OLLI: profile ADV too low (1,187,874)
+Skipping OMC: profile ADV too low (4,424,717)
+ON: liquidity filter kept 5,110/6,253 rows
+Skipping ONDS: too few rows after liquidity filter (136/1071)
+ONON: liquidity filter kept 871/876 rows
+Skipping ONTO: profile ADV too low (1,153,948)
+ORCL: liquidity filter kept 6,858/8,336 rows
+ORLY: liquidity filter kept 3,612/8,027 rows
+OSCR: liquidity filter kept 713/1,012 rows
+Skipping OSK: profile ADV too low (731,060)
+Skipping OTIS: profile ADV too low (3,151,438)
+Skipping OUNZ: profile ADV too low (1,299,000)
+Skipping OVV: profile ADV too low (3,840,119)
+OWL: liquidity filter kept 1,060/1,065 rows
+OXY: liquidity filter kept 6,713/8,336 rows
+PAAS: liquidity filter kept 5,288/7,488 rows
+PANW: liquidity filter kept 3,174/3,179 rows
+PATH: liquidity filter kept 973/978 rows
+Skipping PAYC: profile ADV too low (1,008,265)
+Skipping PAYX: profile ADV too low (3,097,612)
+Skipping PB: profile ADV too low (993,153)
+Skipping PBF: profile ADV too low (3,381,502)
+PBR: liquidity filter kept 2,762/6,183 rows
+Skipping PCAR: profile ADV too low (2,967,162)
+PCG: liquidity filter kept 7,165/8,336 rows
+Skipping PCOR: profile ADV too low (1,795,718)
+Skipping PCTY: profile ADV too low (663,811)
+PDD: liquidity filter kept 1,661/1,666 rows
+Skipping PEG: profile ADV too low (2,808,915)
+Skipping PEGA: profile ADV too low (1,832,859)
+Skipping PEN: profile ADV too low (612,324)
+PFE: liquidity filter kept 7,344/8,336 rows
+Skipping PFG: profile ADV too low (1,345,523)
+Skipping PFGC: profile ADV too low (1,695,015)
+Skipping PFSI: profile ADV too low (510,440)
+Skipping PGR: profile ADV too low (3,304,444)
+Skipping PH: profile ADV too low (662,764)
+Skipping PHM: profile ADV too low (1,984,335)
+Skipping PHYS: profile ADV too low (4,836,309)
+Skipping PI: profile ADV too low (583,363)
+PINS: liquidity filter kept 1,478/1,483 rows
+Skipping PKG: profile ADV too low (849,340)
+Skipping PL: too few rows after liquidity filter (238/975)
+Skipping PLD: profile ADV too low (3,650,814)
+Skipping PLNT: profile ADV too low (1,622,090)
+PLTR: liquidity filter kept 1,112/1,117 rows
+PM: liquidity filter kept 4,270/4,275 rows
+Skipping PNC: profile ADV too low (2,179,204)
+Skipping PNFP: profile ADV too low (1,261,746)
+Skipping PNR: profile ADV too low (1,487,437)
+Skipping PNW: profile ADV too low (1,195,709)
+Skipping PODD: profile ADV too low (847,610)
+Skipping POOL: profile ADV too low (712,811)
+Skipping POWL: profile ADV too low (771,592)
+Skipping PPG: profile ADV too low (1,980,464)
+PPL: liquidity filter kept 5,824/8,336 rows
+Skipping PPLT: profile ADV too low (577,244)
+PR: liquidity filter kept 1,721/2,240 rows
+Skipping PRAX: profile ADV too low (590,702)
+Skipping PRIM: profile ADV too low (970,635)
+PRMB: liquidity filter kept 1,852/8,243 rows
+Skipping PRU: profile ADV too low (1,878,239)
+Skipping PSA: profile ADV too low (1,005,178)
+PSKY: liquidity filter kept 4,748/4,847 rows
+PSLV: liquidity filter kept 1,681/3,613 rows
+Skipping PSTG: profile ADV too low (3,159,771)
+Skipping PSX: profile ADV too low (2,815,568)
+Skipping PTC: profile ADV too low (1,030,902)
+Skipping PWR: profile ADV too low (1,078,930)
+PYPL: liquidity filter kept 2,432/2,437 rows
+QBTS: liquidity filter kept 307/1,066 rows
+QCOM: liquidity filter kept 6,777/8,336 rows
+Skipping QGEN: profile ADV too low (1,669,371)
+Skipping QRVO: profile ADV too low (1,569,090)
+QS: liquidity filter kept 1,033/1,148 rows
+Skipping QSR: profile ADV too low (2,999,288)
+QUBT: liquidity filter kept 320/4,051 rows
+QXO: liquidity filter kept 398/2,607 rows
+Skipping RACE: profile ADV too low (609,329)
+Skipping RAPT: profile ADV too low (722,096)
+Skipping RBA: profile ADV too low (1,167,201)
+Skipping RBC: profile ADV too low (192,628)
+RBLX: liquidity filter kept 1,002/1,007 rows
+RCAT: liquidity filter kept 313/5,121 rows
+Skipping RCL: profile ADV too low (2,329,619)
+RDW: liquidity filter kept 309/1,044 rows
+Skipping REGN: profile ADV too low (982,980)
+Skipping RELX: profile ADV too low (2,205,419)
+Skipping REXR: profile ADV too low (2,539,556)
+RF: liquidity filter kept 4,583/8,336 rows
+Skipping RGEN: profile ADV too low (849,917)
+Skipping RGLD: profile ADV too low (963,209)
+RGTI: liquidity filter kept 313/977 rows
+Skipping RH: profile ADV too low (1,170,200)
+Skipping RHI: profile ADV too low (2,412,446)
+RIOT: liquidity filter kept 1,355/2,251 rows
+RITM: liquidity filter kept 2,276/2,984 rows
+RIVN: liquidity filter kept 831/836 rows
+Skipping RJF: profile ADV too low (1,234,483)
+RKLB: liquidity filter kept 669/1,078 rows
+RKT: liquidity filter kept 1,150/1,155 rows
+Skipping RL: profile ADV too low (647,408)
+Skipping RMBS: profile ADV too low (1,894,998)
+Skipping RMD: profile ADV too low (1,037,190)
+Skipping RNG: profile ADV too low (1,744,757)
+Skipping RNR: profile ADV too low (402,211)
+ROIV: liquidity filter kept 813/1,069 rows
+Skipping ROK: profile ADV too low (900,768)
+Skipping ROKU: profile ADV too low (3,376,741)
+Skipping ROL: profile ADV too low (2,338,485)
+Skipping ROST: profile ADV too low (2,748,382)
+Skipping RPM: profile ADV too low (923,662)
+Skipping RRC: profile ADV too low (3,122,060)
+Skipping RRX: profile ADV too low (903,948)
+Skipping RS: profile ADV too low (350,281)
+Skipping RSG: profile ADV too low (1,420,043)
+RUN: liquidity filter kept 2,019/2,415 rows
+Skipping RVMD: profile ADV too low (2,680,322)
+Skipping RVTY: profile ADV too low (1,310,632)
+Skipping RYAAY: profile ADV too low (1,322,510)
+Skipping RYAN: profile ADV too low (1,651,822)
+S: liquidity filter kept 924/929 rows
+Skipping SAIA: profile ADV too low (564,584)
+SAN: liquidity filter kept 1,373/8,336 rows
+Skipping SANM: profile ADV too low (746,029)
+Skipping SAP: profile ADV too low (2,085,867)
+SATS: liquidity filter kept 1,433/4,326 rows
+Skipping SBAC: profile ADV too low (990,521)
+SBSW: liquidity filter kept 1,548/3,040 rows
+SBUX: liquidity filter kept 5,529/8,235 rows
+Skipping SCCO: profile ADV too low (1,627,508)
+SCHW: liquidity filter kept 7,157/8,336 rows
+Skipping SE: profile ADV too low (4,718,827)
+Skipping SEDG: profile ADV too low (4,295,658)
+Skipping SEI: profile ADV too low (2,615,067)
+Skipping SF: profile ADV too low (1,239,179)
+Skipping SFM: profile ADV too low (2,363,002)
+Skipping SGI: profile ADV too low (2,325,777)
+SGOL: liquidity filter kept 2,123/3,901 rows
+Skipping SHAK: profile ADV too low (1,455,640)
+SHEL: liquidity filter kept 8,155/8,216 rows
+SHOP: liquidity filter kept 2,297/2,468 rows
+Skipping SHW: profile ADV too low (1,800,150)
+Skipping SIRI: profile ADV too low (4,095,446)
+Skipping SITM: profile ADV too low (374,548)
+Skipping SIVR: profile ADV too low (2,518,464)
+Skipping SJM: profile ADV too low (1,944,644)
+Skipping SLAB: profile ADV too low (438,108)
+SLV: liquidity filter kept 4,743/4,748 rows
+Skipping SM: profile ADV too low (3,803,942)
+SMCI: liquidity filter kept 931/4,518 rows
+SMR: liquidity filter kept 505/761 rows
+Skipping SMTC: profile ADV too low (1,920,686)
+Skipping SN: profile ADV too low (1,729,375)
+Skipping SNA: profile ADV too low (338,117)
+SNOW: liquidity filter kept 1,122/1,127 rows
+Skipping SNPS: profile ADV too low (2,157,625)
+Skipping SNY: profile ADV too low (2,996,397)
+SO: liquidity filter kept 6,428/8,336 rows
+SOFI: liquidity filter kept 1,001/1,052 rows
+SONY: liquidity filter kept 5,276/8,336 rows
+SOUN: liquidity filter kept 409/720 rows
+Skipping SPG: profile ADV too low (1,557,679)
+Skipping SPGI: profile ADV too low (1,713,483)
+Skipping SPOT: profile ADV too low (2,118,039)
+Skipping SQM: profile ADV too low (1,418,838)
+Skipping SRE: profile ADV too low (3,732,631)
+Skipping SSNC: profile ADV too low (1,643,692)
+Skipping SSRM: profile ADV too low (3,365,003)
+Skipping STE: profile ADV too low (670,179)
+STLA: liquidity filter kept 2,433/2,954 rows
+Skipping STLD: profile ADV too low (1,303,281)
+STM: liquidity filter kept 5,039/7,615 rows
+Skipping STRL: profile ADV too low (558,147)
+Skipping STT: profile ADV too low (1,999,142)
+Skipping STX: profile ADV too low (4,193,558)
+Skipping STZ: profile ADV too low (2,377,225)
+Skipping SU: profile ADV too low (4,511,718)
+Skipping SUI: profile ADV too low (836,950)
+Skipping SW: profile ADV too low (4,974,713)
+Skipping SWK: profile ADV too low (2,074,211)
+Skipping SWKS: profile ADV too low (3,230,693)
+Skipping SYF: profile ADV too low (3,736,883)
+Skipping SYK: profile ADV too low (1,642,158)
+Skipping SYM: profile ADV too low (2,152,362)
+Skipping SYY: profile ADV too low (3,564,140)
+T: liquidity filter kept 5,966/8,336 rows
+Skipping TAP: profile ADV too low (2,941,543)
+Skipping TCOM: profile ADV too low (2,841,961)
+Skipping TD: profile ADV too low (2,117,339)
+Skipping TDG: profile ADV too low (338,485)
+Skipping TDY: profile ADV too low (347,817)
+Skipping TEAM: profile ADV too low (4,163,335)
+Skipping TECH: profile ADV too low (2,302,927)
+Skipping TECK: profile ADV too low (4,369,899)
+Skipping TEL: profile ADV too low (2,007,949)
+Skipping TER: profile ADV too low (3,546,702)
+TEVA: liquidity filter kept 6,774/8,336 rows
+Skipping TEX: profile ADV too low (1,221,430)
+TFC: liquidity filter kept 6,226/8,336 rows
+Skipping TFX: profile ADV too low (720,948)
+TGT: liquidity filter kept 7,388/8,336 rows
+Skipping THC: profile ADV too low (1,229,909)
+TJX: liquidity filter kept 4,832/8,336 rows
+Skipping TKO: profile ADV too low (1,138,405)
+Skipping TLN: profile ADV too low (930,132)
+Skipping TMDX: profile ADV too low (996,372)
+Skipping TMO: profile ADV too low (2,275,128)
+Skipping TOL: profile ADV too low (1,399,058)
+TOST: liquidity filter kept 866/871 rows
+Skipping TPG: profile ADV too low (2,420,579)
+Skipping TPH: profile ADV too low (1,501,801)
+Skipping TPL: profile ADV too low (451,796)
+Skipping TPR: profile ADV too low (3,083,588)
+Skipping TRGP: profile ADV too low (1,533,149)
+Skipping TRI: profile ADV too low (1,667,601)
+Skipping TRMB: profile ADV too low (1,630,056)
+Skipping TROW: profile ADV too low (1,827,585)
+Skipping TRP: profile ADV too low (2,303,396)
+Skipping TRU: profile ADV too low (2,597,918)
+Skipping TRV: profile ADV too low (1,360,721)
+TSCO: liquidity filter kept 3,716/7,781 rows
+Skipping TSEM: profile ADV too low (1,661,067)
+TSLA: liquidity filter kept 3,229/3,699 rows
+TSM: liquidity filter kept 5,386/6,898 rows
+Skipping TSN: profile ADV too low (2,895,502)
+Skipping TT: profile ADV too low (1,355,083)
+TTD: liquidity filter kept 2,053/2,130 rows
+Skipping TTE: profile ADV too low (1,584,588)
+Skipping TTEK: profile ADV too low (2,456,979)
+Skipping TTMI: profile ADV too low (2,225,614)
+Skipping TTWO: profile ADV too low (1,883,887)
+Skipping TW: profile ADV too low (1,384,763)
+Skipping TWLO: profile ADV too low (2,709,631)
+TXN: liquidity filter kept 7,426/8,336 rows
+Skipping TXRH: profile ADV too low (1,045,923)
+Skipping TXT: profile ADV too low (1,523,541)
+Skipping TYL: profile ADV too low (432,823)
+U: liquidity filter kept 1,120/1,125 rows
+UAL: liquidity filter kept 4,722/4,805 rows
+Skipping UAMY: too few rows after liquidity filter (119/6300)
+UBER: liquidity filter kept 1,463/1,468 rows
+Skipping UBS: profile ADV too low (2,335,831)
+Skipping UCO: profile ADV too low (4,656,615)
+Skipping UDR: profile ADV too low (3,031,724)
+UEC: liquidity filter kept 614/4,513 rows
+Skipping UHS: profile ADV too low (777,740)
+Skipping ULTA: profile ADV too low (697,440)
+UNH: liquidity filter kept 7,157/8,336 rows
+Skipping UNM: profile ADV too low (1,433,626)
+Skipping UNP: profile ADV too low (3,558,161)
+UPS: liquidity filter kept 6,367/6,372 rows
+UPST: liquidity filter kept 1,058/1,063 rows
+Skipping URBN: profile ADV too low (1,901,914)
+Skipping URI: profile ADV too low (591,419)
+Skipping USAR: too few rows after liquidity filter (204/416)
+USB: liquidity filter kept 6,912/8,336 rows
+Skipping USFD: profile ADV too low (2,309,620)
+USO: liquidity filter kept 4,756/4,761 rows
+Skipping UTHR: profile ADV too low (584,270)
+UUUU: liquidity filter kept 1,051/4,526 rows
+UVIX: liquidity filter kept 734/740 rows
+V: liquidity filter kept 4,268/4,273 rows
+Skipping VAL: profile ADV too low (1,313,981)
+VALE: liquidity filter kept 4,036/5,782 rows
+Skipping VEEV: profile ADV too low (1,858,269)
+VFC: liquidity filter kept 5,411/8,336 rows
+Skipping VIAV: profile ADV too low (4,024,448)
+VICI: liquidity filter kept 1,803/1,808 rows
+Skipping VICR: profile ADV too low (524,760)
+Skipping VLO: profile ADV too low (3,136,615)
+Skipping VLTO: profile ADV too low (1,590,820)
+VLY: liquidity filter kept 2,677/8,248 rows
+Skipping VMC: profile ADV too low (1,033,706)
+Skipping VNOM: profile ADV too low (2,134,790)
+Skipping VRNS: profile ADV too low (2,248,737)
+Skipping VRSK: profile ADV too low (1,471,680)
+Skipping VRSN: profile ADV too low (844,783)
+VRT: liquidity filter kept 1,549/1,661 rows
+Skipping VRTX: profile ADV too low (1,493,793)
+Skipping VSCO: profile ADV too low (2,673,054)
+Skipping VSEC: profile ADV too low (383,275)
+Skipping VST: profile ADV too low (4,885,712)
+Skipping VTR: profile ADV too low (3,142,737)
+VTRS: liquidity filter kept 7,140/8,336 rows
+VXX: liquidity filter kept 1,787/1,792 rows
+VZ: liquidity filter kept 7,475/8,336 rows
+Skipping W: profile ADV too low (3,977,366)
+Skipping WAB: profile ADV too low (956,155)
+Skipping WAL: profile ADV too low (1,139,231)
+Skipping WAT: profile ADV too low (818,671)
+WBD: liquidity filter kept 4,931/4,951 rows
+Skipping WBS: profile ADV too low (2,242,825)
+Skipping WCC: profile ADV too low (607,181)
+Skipping WCN: profile ADV too low (1,307,674)
+Skipping WDAY: profile ADV too low (3,628,471)
+WDC: liquidity filter kept 6,407/8,336 rows
+Skipping WEC: profile ADV too low (2,119,348)
+Skipping WELL: profile ADV too low (3,080,240)
+WFC: liquidity filter kept 7,370/8,336 rows
+Skipping WFRD: profile ADV too low (1,085,347)
+Skipping WH: profile ADV too low (1,188,155)
+Skipping WHR: profile ADV too low (1,840,582)
+Skipping WING: profile ADV too low (923,051)
+Skipping WIX: profile ADV too low (1,800,593)
+Skipping WLK: profile ADV too low (1,330,881)
+WMB: liquidity filter kept 6,416/8,336 rows
+Skipping WMS: profile ADV too low (773,904)
+WMT: liquidity filter kept 7,052/8,336 rows
+Skipping WRB: profile ADV too low (2,298,832)
+Skipping WSM: profile ADV too low (1,296,254)
+Skipping WSO: profile ADV too low (423,561)
+Skipping WST: profile ADV too low (781,709)
+Skipping WTRG: profile ADV too low (2,116,709)
+Skipping WTW: profile ADV too low (678,963)
+WULF: liquidity filter kept 259/6,781 rows
+Skipping WWD: profile ADV too low (596,267)
+WY: liquidity filter kept 5,801/8,336 rows
+Skipping WYNN: profile ADV too low (1,803,246)
+Skipping XEL: profile ADV too low (4,523,982)
+XPEV: liquidity filter kept 1,135/1,140 rows
+Skipping XPO: profile ADV too low (1,427,633)
+Skipping XYL: profile ADV too low (1,510,084)
+XYZ: liquidity filter kept 2,335/2,340 rows
+Skipping YUM: profile ADV too low (1,935,088)
+Skipping YUMC: profile ADV too low (1,698,754)
+Skipping Z: profile ADV too low (3,132,906)
+Skipping ZBH: profile ADV too low (2,033,377)
+Skipping ZBRA: profile ADV too low (646,325)
+ZETA: liquidity filter kept 614/943 rows
+Skipping ZIM: profile ADV too low (4,578,084)
+Skipping ZION: profile ADV too low (1,652,206)
+Skipping ZM: profile ADV too low (3,438,574)
+Skipping ZS: profile ADV too low (2,212,144)
+Skipping ZTS: profile ADV too low (4,017,790)
+Features: 70
+Train rows: 578,068
+Test rows: 319,237
+Split date: 2019-08-12
+Baselines:
+{
+    "random": {
+        "trade_rate": 0.025905518470603343,
+        "long_rate": 0.025905518470603343,
+        "short_rate": 0.0,
+        "hit_rate": 0.4785973397823458,
+        "mean_return": 0.006442008795375074,
+        "median_return": -0.006184504605488995,
+        "sharpe_like": 0.08199274439646057,
+        "rank_ic_mean": 0.0009356678288440211,
+        "rank_ic_ir": 0.01280026802104402,
+        "n_trades": 8270,
+        "long_stats": {
+            "hit_rate": 0.4785973397823458,
+            "mean_return": 0.006442008795375074,
+            "median_return": -0.006184504605488995,
+            "n": 8270
+        },
+        "short_stats": {
+            "hit_rate": 0.0,
+            "mean_return": 0.0,
+            "median_return": 0.0,
+            "n": 0
+        }
+    },
+    "momentum_1m": {
+        "trade_rate": 0.02588672365671899,
+        "long_rate": 0.02588672365671899,
+        "short_rate": 0.0,
+        "hit_rate": 0.47967086156824784,
+        "mean_return": 0.014479130553734525,
+        "median_return": -0.005779494461507071,
+        "sharpe_like": 0.14309497043619718,
+        "rank_ic_mean": -0.014697202938580721,
+        "rank_ic_ir": -0.08823805928670157,
+        "n_trades": 8264,
+        "long_stats": {
+            "hit_rate": 0.47967086156824784,
+            "mean_return": 0.014479130553734525,
+            "median_return": -0.005779494461507071,
+            "n": 8264
+        },
+        "short_stats": {
+            "hit_rate": 0.0,
+            "mean_return": 0.0,
+            "median_return": 0.0,
+            "n": 0
+        }
+    },
+    "reversal_1m": {
+        "trade_rate": 0.025883591187738263,
+        "long_rate": 0.025883591187738263,
+        "short_rate": 0.0,
+        "hit_rate": 0.48299649037879705,
+        "mean_return": 0.01662022721869692,
+        "median_return": -0.005081181196877254,
+        "sharpe_like": 0.18841049466994964,
+        "rank_ic_mean": 0.014697202938580721,
+        "rank_ic_ir": 0.08823805928670157,
+        "n_trades": 8263,
+        "long_stats": {
+            "hit_rate": 0.48299649037879705,
+            "mean_return": 0.01662022721869692,
+            "median_return": -0.005081181196877254,
+            "n": 8263
+        },
+        "short_stats": {
+            "hit_rate": 0.0,
+            "mean_return": 0.0,
+            "median_return": 0.0,
+            "n": 0
+        }
+    }
+}
+LGBM drawdown analysis:
+{
+    "max_drawdown": -0.46169446215979515,
+    "peak_date": "2020-02-19",
+    "trough_date": "2020-03-17",
+    "peak_equity": 1.3497336202972703,
+    "trough_equity": 0.7265690824151289,
+    "benchmark": {
+        "spy_total_return": -0.25282249031150084,
+        "spy_max_drawdown": -0.2881732080048385
+    },
+    "model_type": "LGBM"
+}
+{
+    "type": "LGBM",
+    "mae": 0.12655693709185692,
+    "rmse": 0.19999412280270853,
+    "trade_rate": 0.025861663904873183,
+    "long_rate": 0.025861663904873183,
+    "short_rate": 0.0,
+    "hit_rate": 0.5245881782945736,
+    "mean_return": 0.022052829383355548,
+    "median_return": 0.007626074159530041,
+    "sharpe_like": 0.2771409263869056,
+    "rank_ic_mean": 0.037399633471348614,
+    "rank_ic_ir": 0.29052958868690026,
+    "n_trades": 8256,
+    "long_stats": {
+        "hit_rate": 0.5245881782945736,
+        "mean_return": 0.022052829383355548,
+        "median_return": 0.007626074159530041,
+        "n": 8256
+    },
+    "short_stats": {
+        "hit_rate": 0.0,
+        "mean_return": 0.0,
+        "median_return": 0.0,
+        "n": 0
+    },
+    "portfolio": {
+        "portfolio_days": 1653,
+        "portfolio_total_return": 7.185366124746714,
+        "portfolio_cagr_like": 0.3778208189981409,
+        "portfolio_sharpe_like": 1.2001241524515613,
+        "portfolio_max_drawdown": -0.46169446215979515,
+        "portfolio_win_rate": 0.5499092558983666,
+        "portfolio_mean_daily_return": 0.0014590295993501688,
+        "portfolio_median_daily_return": 0.0016967267125991743,
+        "portfolio_avg_holdings": 18.669691470054445,
+        "portfolio_avg_turnover": 2.0344827586206895
+    },
+    "yearly_portfolio": {
+        "2019": {
+            "portfolio_days": 97,
+            "portfolio_total_return": 0.272091714827319,
+            "portfolio_cagr_like": 0.8686690845243381,
+            "portfolio_sharpe_like": 3.7195639705979064,
+            "portfolio_max_drawdown": -0.07621189587230537,
+            "portfolio_win_rate": 0.6597938144329897,
+            "portfolio_mean_daily_return": 0.0025424049114420016,
+            "portfolio_median_daily_return": 0.003100540672802912,
+            "portfolio_avg_holdings": 18.061855670103093,
+            "portfolio_avg_turnover": 2.1443298969072164
+        },
+        "2020": {
+            "portfolio_days": 252,
+            "portfolio_total_return": 0.828947549673045,
+            "portfolio_cagr_like": 0.828947549673045,
+            "portfolio_sharpe_like": 1.494878397361379,
+            "portfolio_max_drawdown": -0.4800327789613066,
+            "portfolio_win_rate": 0.5515873015873016,
+            "portfolio_mean_daily_return": 0.0028632358929530253,
+            "portfolio_median_daily_return": 0.0022078596810654826,
+            "portfolio_avg_holdings": 17.396825396825395,
+            "portfolio_avg_turnover": 2.261904761904762
+        },
+        "2021": {
+            "portfolio_days": 251,
+            "portfolio_total_return": 0.592980297548251,
+            "portfolio_cagr_like": 0.5959380290102263,
+            "portfolio_sharpe_like": 2.295939360106554,
+            "portfolio_max_drawdown": -0.0948564139874074,
+            "portfolio_win_rate": 0.549800796812749,
+            "portfolio_mean_daily_return": 0.0019467733100898138,
+            "portfolio_median_daily_return": 0.0015670818525829028,
+            "portfolio_avg_holdings": 17.310756972111555,
+            "portfolio_avg_turnover": 1.9681274900398407
+        },
+        "2022": {
+            "portfolio_days": 250,
+            "portfolio_total_return": -0.2740289717393395,
+            "portfolio_cagr_like": -0.27588650099252143,
+            "portfolio_sharpe_like": -0.6109421228568492,
+            "portfolio_max_drawdown": -0.2966433789469177,
+            "portfolio_win_rate": 0.464,
+            "portfolio_mean_daily_return": -0.0009665606067368184,
+            "portfolio_median_daily_return": -0.00120794556086107,
+            "portfolio_avg_holdings": 19.084,
+            "portfolio_avg_turnover": 1.736
+        },
+        "2023": {
+            "portfolio_days": 249,
+            "portfolio_total_return": 0.5022802944774813,
+            "portfolio_cagr_like": 0.5096647006093786,
+            "portfolio_sharpe_like": 1.9082763940586884,
+            "portfolio_max_drawdown": -0.1401808877236269,
+            "portfolio_win_rate": 0.5421686746987951,
+            "portfolio_mean_daily_return": 0.0017397990696651749,
+            "portfolio_median_daily_return": 0.0012947561868029722,
+            "portfolio_avg_holdings": 19.27710843373494,
+            "portfolio_avg_turnover": 1.9196787148594376
+        },
+        "2024": {
+            "portfolio_days": 251,
+            "portfolio_total_return": 0.20247979000443062,
+            "portfolio_cagr_like": 0.20336346249928194,
+            "portfolio_sharpe_like": 1.0242494723951352,
+            "portfolio_max_drawdown": -0.14016899824591367,
+            "portfolio_win_rate": 0.5577689243027888,
+            "portfolio_mean_daily_return": 0.0008145636669830494,
+            "portfolio_median_daily_return": 0.002190961091551519,
+            "portfolio_avg_holdings": 18.358565737051794,
+            "portfolio_avg_turnover": 2.1314741035856573
+        },
+        "2025": {
+            "portfolio_days": 249,
+            "portfolio_total_return": 0.40331485487471164,
+            "portfolio_cagr_like": 0.4090554230836696,
+            "portfolio_sharpe_like": 1.4336490580071937,
+            "portfolio_max_drawdown": -0.24394920234783068,
+            "portfolio_win_rate": 0.5943775100401606,
+            "portfolio_mean_daily_return": 0.00149730635180461,
+            "portfolio_median_daily_return": 0.002031033998012479,
+            "portfolio_avg_holdings": 19.204819277108435,
+            "portfolio_avg_turnover": 1.9799196787148594
+        }
+    },
+    "cost_sensitivity": {
+        "10bps": {
+            "portfolio_days": 1653,
+            "portfolio_total_return": 7.185366124746714,
+            "portfolio_cagr_like": 0.3778208189981409,
+            "portfolio_sharpe_like": 1.2001241524515613,
+            "portfolio_max_drawdown": -0.46169446215979515,
+            "portfolio_win_rate": 0.5499092558983666,
+            "portfolio_mean_daily_return": 0.0014590295993501688,
+            "portfolio_median_daily_return": 0.0016967267125991743,
+            "portfolio_avg_holdings": 18.669691470054445,
+            "portfolio_avg_turnover": 2.0344827586206895
+        },
+        "25bps": {
+            "portfolio_days": 1653,
+            "portfolio_total_return": 5.9197076449968415,
+            "portfolio_cagr_like": 0.3429859002577951,
+            "portfolio_sharpe_like": 1.1164766836497124,
+            "portfolio_max_drawdown": -0.4638022559026397,
+            "portfolio_win_rate": 0.5462794918330308,
+            "portfolio_mean_daily_return": 0.0013573054614191345,
+            "portfolio_median_daily_return": 0.0016465924493620438,
+            "portfolio_avg_holdings": 18.669691470054445,
+            "portfolio_avg_turnover": 2.0344827586206895
+        },
+        "50bps": {
+            "portfolio_days": 1653,
+            "portfolio_total_return": 4.229701177426033,
+            "portfolio_cagr_like": 0.2868616680389231,
+            "portfolio_sharpe_like": 0.9770174234771521,
+            "portfolio_max_drawdown": -0.46729819562358565,
+            "portfolio_win_rate": 0.5402298850574713,
+            "portfolio_mean_daily_return": 0.0011877652315340768,
+            "portfolio_median_daily_return": 0.0014657418374300298,
+            "portfolio_avg_holdings": 18.669691470054445,
+            "portfolio_avg_turnover": 2.0344827586206895
+        },
+        "100bps": {
+            "portfolio_days": 1653,
+            "portfolio_total_return": 1.986441731411246,
+            "portfolio_cagr_like": 0.181509661652135,
+            "portfolio_sharpe_like": 0.6979971029019556,
+            "portfolio_max_drawdown": -0.4742265694144958,
+            "portfolio_win_rate": 0.5329703569267997,
+            "portfolio_mean_daily_return": 0.0008486847717639619,
+            "portfolio_median_daily_return": 0.001134223271648783,
+            "portfolio_avg_holdings": 18.669691470054445,
+            "portfolio_avg_turnover": 2.0344827586206895
+        }
+    },
+    "drawdown_analysis": {
+        "max_drawdown": -0.46169446215979515,
+        "peak_date": "2020-02-19",
+        "trough_date": "2020-03-17",
+        "peak_equity": 1.3497336202972703,
+        "trough_equity": 0.7265690824151289,
+        "benchmark": {
+            "spy_total_return": -0.25282249031150084,
+            "spy_max_drawdown": -0.2881732080048385
+        },
+        "model_type": "LGBM"
+    }
+}
+CAT drawdown analysis:
+{
+    "max_drawdown": -0.4317903520332863,
+    "peak_date": "2020-02-18",
+    "trough_date": "2020-03-17",
+    "peak_equity": 1.2461499764801223,
+    "trough_equity": 0.7080744394494988,
+    "model_type": "CAT",
+    "benchmark": {
+        "spy_total_return": -0.24925018242280872,
+        "spy_max_drawdown": -0.291097525972817
+    }
+}
+{
+    "type": "CAT",
+    "mae": 0.1239645678651738,
+    "rmse": 0.19665476899907958,
+    "trade_rate": 0.025836604153027375,
+    "long_rate": 0.025836604153027375,
+    "short_rate": 0.0,
+    "hit_rate": 0.516003879728419,
+    "mean_return": 0.02970160477729994,
+    "median_return": 0.004900950307005159,
+    "sharpe_like": 0.3015477594909243,
+    "rank_ic_mean": 0.049976918427261964,
+    "rank_ic_ir": 0.3373925179605113,
+    "n_trades": 8248,
+    "long_stats": {
+        "hit_rate": 0.516003879728419,
+        "mean_return": 0.02970160477729994,
+        "median_return": 0.004900950307005159,
+        "n": 8248
+    },
+    "short_stats": {
+        "hit_rate": 0.0,
+        "mean_return": 0.0,
+        "median_return": 0.0,
+        "n": 0
+    },
+    "portfolio": {
+        "portfolio_days": 1653,
+        "portfolio_total_return": 13.522980643916991,
+        "portfolio_cagr_like": 0.5036802856298228,
+        "portfolio_sharpe_like": 1.504236283154982,
+        "portfolio_max_drawdown": -0.4317903520332863,
+        "portfolio_win_rate": 0.5486993345432547,
+        "portfolio_mean_daily_return": 0.0017999603001098157,
+        "portfolio_median_daily_return": 0.0017643162845747645,
+        "portfolio_avg_holdings": 17.468239564428313,
+        "portfolio_avg_turnover": 1.4452510586811858
+    },
+    "yearly_portfolio": {
+        "2019": {
+            "portfolio_days": 97,
+            "portfolio_total_return": 0.19925255582639445,
+            "portfolio_cagr_like": 0.6032638290643897,
+            "portfolio_sharpe_like": 2.996189109460332,
+            "portfolio_max_drawdown": -0.050563830303341994,
+            "portfolio_win_rate": 0.6288659793814433,
+            "portfolio_mean_daily_return": 0.0019266298937201036,
+            "portfolio_median_daily_return": 0.002544250382637945,
+            "portfolio_avg_holdings": 16.5979381443299,
+            "portfolio_avg_turnover": 1.1134020618556701
+        },
+        "2020": {
+            "portfolio_days": 252,
+            "portfolio_total_return": 1.1042556116722548,
+            "portfolio_cagr_like": 1.1042556116722548,
+            "portfolio_sharpe_like": 1.8431649163130812,
+            "portfolio_max_drawdown": -0.4242751912527687,
+            "portfolio_win_rate": 0.5674603174603174,
+            "portfolio_mean_daily_return": 0.003376966288322414,
+            "portfolio_median_daily_return": 0.002998206599133925,
+            "portfolio_avg_holdings": 17.555555555555557,
+            "portfolio_avg_turnover": 1.5833333333333333
+        },
+        "2021": {
+            "portfolio_days": 251,
+            "portfolio_total_return": 0.41675392803886746,
+            "portfolio_cagr_like": 0.41872163642789073,
+            "portfolio_sharpe_like": 1.5926438369437823,
+            "portfolio_max_drawdown": -0.14051191100694382,
+            "portfolio_win_rate": 0.5378486055776892,
+            "portfolio_mean_daily_return": 0.001500169300546037,
+            "portfolio_median_daily_return": 0.001232914999418206,
+            "portfolio_avg_holdings": 17.91235059760956,
+            "portfolio_avg_turnover": 1.1314741035856575
+        },
+        "2022": {
+            "portfolio_days": 250,
+            "portfolio_total_return": -0.20627685452678468,
+            "portfolio_cagr_like": -0.20774243073265375,
+            "portfolio_sharpe_like": -0.44392023255963753,
+            "portfolio_max_drawdown": -0.23902282689357257,
+            "portfolio_win_rate": 0.452,
+            "portfolio_mean_daily_return": -0.0006524183932457182,
+            "portfolio_median_daily_return": -0.0019586729600907828,
+            "portfolio_avg_holdings": 16.076,
+            "portfolio_avg_turnover": 1.392
+        },
+        "2023": {
+            "portfolio_days": 249,
+            "portfolio_total_return": 0.7722075803468749,
+            "portfolio_cagr_like": 0.784467906190264,
+            "portfolio_sharpe_like": 2.593160961888491,
+            "portfolio_max_drawdown": -0.15718060819936752,
+            "portfolio_win_rate": 0.5662650602409639,
+            "portfolio_mean_daily_return": 0.0024085002110372446,
+            "portfolio_median_daily_return": 0.0024715331351842246,
+            "portfolio_avg_holdings": 16.80722891566265,
+            "portfolio_avg_turnover": 1.4779116465863453
+        },
+        "2024": {
+            "portfolio_days": 251,
+            "portfolio_total_return": 0.45421794244466773,
+            "portfolio_cagr_like": 0.45638911726066134,
+            "portfolio_sharpe_like": 1.9609334807068965,
+            "portfolio_max_drawdown": -0.14779433336137282,
+            "portfolio_win_rate": 0.5936254980079682,
+            "portfolio_mean_daily_return": 0.0015740583080896152,
+            "portfolio_median_daily_return": 0.0023684676704667693,
+            "portfolio_avg_holdings": 16.904382470119522,
+            "portfolio_avg_turnover": 1.247011952191235
+        },
+        "2025": {
+            "portfolio_days": 249,
+            "portfolio_total_return": 0.8536680687112765,
+            "portfolio_cagr_like": 0.8675028345415536,
+            "portfolio_sharpe_like": 2.5174431430838067,
+            "portfolio_max_drawdown": -0.14973493341406074,
+            "portfolio_win_rate": 0.5662650602409639,
+            "portfolio_mean_daily_return": 0.002615481311125553,
+            "portfolio_median_daily_return": 0.0021613337675072813,
+            "portfolio_avg_holdings": 18.991967871485944,
+            "portfolio_avg_turnover": 1.7028112449799198
+        }
+    },
+    "cost_sensitivity": {
+        "10bps": {
+            "portfolio_days": 1653,
+            "portfolio_total_return": 13.522980643916991,
+            "portfolio_cagr_like": 0.5036802856298228,
+            "portfolio_sharpe_like": 1.504236283154982,
+            "portfolio_max_drawdown": -0.4317903520332863,
+            "portfolio_win_rate": 0.5486993345432547,
+            "portfolio_mean_daily_return": 0.0017999603001098157,
+            "portfolio_median_daily_return": 0.0017643162845747645,
+            "portfolio_avg_holdings": 17.468239564428313,
+            "portfolio_avg_turnover": 1.4452510586811858
+        },
+        "25bps": {
+            "portfolio_days": 1653,
+            "portfolio_total_return": 11.889712671682279,
+            "portfolio_cagr_like": 0.4765789815798407,
+            "portfolio_sharpe_like": 1.4438184090990016,
+            "portfolio_max_drawdown": -0.4334725021873149,
+            "portfolio_win_rate": 0.5480943738656987,
+            "portfolio_mean_daily_return": 0.001727697747175756,
+            "portfolio_median_daily_return": 0.0017495550914918396,
+            "portfolio_avg_holdings": 17.468239564428313,
+            "portfolio_avg_turnover": 1.4452510586811858
+        },
+        "50bps": {
+            "portfolio_days": 1653,
+            "portfolio_total_return": 9.565088795953598,
+            "portfolio_cagr_like": 0.43248325786612174,
+            "portfolio_sharpe_like": 1.3430878209928558,
+            "portfolio_max_drawdown": -0.4362657465158635,
+            "portfolio_win_rate": 0.5456745311554749,
+            "portfolio_mean_daily_return": 0.0016072601589523234,
+            "portfolio_median_daily_return": 0.0016606824932005953,
+            "portfolio_avg_holdings": 17.468239564428313,
+            "portfolio_avg_turnover": 1.4452510586811858
+        },
+        "100bps": {
+            "portfolio_days": 1653,
+            "portfolio_total_return": 6.096976722095094,
+            "portfolio_cagr_like": 0.34817482810355593,
+            "portfolio_sharpe_like": 1.141538484569126,
+            "portfolio_max_drawdown": -0.44205897548106254,
+            "portfolio_win_rate": 0.5402298850574713,
+            "portfolio_mean_daily_return": 0.0013663849825054596,
+            "portfolio_median_daily_return": 0.0014569512522460025,
+            "portfolio_avg_holdings": 17.468239564428313,
+            "portfolio_avg_turnover": 1.4452510586811858
+        }
+    },
+    "drawdown_analysis": {
+        "max_drawdown": -0.4317903520332863,
+        "peak_date": "2020-02-18",
+        "trough_date": "2020-03-17",
+        "peak_equity": 1.2461499764801223,
+        "trough_equity": 0.7080744394494988,
+        "model_type": "CAT",
+        "benchmark": {
+            "spy_total_return": -0.24925018242280872,
+            "spy_max_drawdown": -0.291097525972817
+        }
+    }
+}
+Best model: CAT
+Latest ranked predictions:
+      Date ticker profile_group      pred  pred_signal  target_excess_return  future_return  benchmark_future_return
+2026-03-12    EQX         vol_5  0.094463            1             -0.144303      -0.102387                 0.110462
+2026-03-12    KHC         vol_1  0.077697            1              0.044166       0.072996                 0.110462
+2026-03-12    ACI         vol_2  0.072882            1             -0.044023      -0.050385                 0.110462
+2026-03-12   FISV         vol_3  0.062547            1             -0.092197      -0.010523                 0.110462
+2026-03-12    GIS         vol_2  0.062460            0             -0.110726      -0.104940                 0.110462
+2026-03-12    IAG         vol_5  0.060213            0             -0.190748      -0.125351                 0.110462
+2026-03-12    CAG         vol_2  0.046359            0             -0.137617      -0.126160                 0.110462
+2026-03-12     CL         vol_1  0.045732            0             -0.008338      -0.004548                 0.110462
+2026-03-12   PAAS         vol_5  0.045258            0             -0.097533      -0.015482                 0.110462
+2026-03-12   LUMN         vol_5  0.042157            0              0.089630       0.316770                 0.110462
+2026-03-12    OWL         vol_3  0.039801            0              0.034988       0.226481                 0.110462
+2026-03-12    KGC         vol_4  0.037534            1             -0.074414      -0.031058                 0.110462
+2026-03-12    BSX         vol_3  0.037040            0             -0.279026      -0.213275                 0.110462
+2026-03-12    CZR         vol_5  0.034743            0             -0.173480      -0.013024                 0.110462
+2026-03-12    NEM         vol_4  0.034536            0             -0.037706       0.017732                 0.110462
+2026-03-12   MARA         vol_5  0.033271            0              0.224238       0.477169                 0.110462
+2026-03-12    GLD         vol_3  0.032589            0             -0.074936      -0.070918                 0.110462
+2026-03-12    SMR         vol_5  0.031834            0             -0.198285       0.067177                 0.110462
+2026-03-12    UNH         vol_3  0.029016            0              0.339679       0.371521                 0.110462
+2026-03-12     PM         vol_1  0.027454            0             -0.010240       0.003002                 0.110462
+2026-03-12   KVUE         vol_1  0.027230            0             -0.017255       0.011501                 0.110462
+2026-03-12    AEO         vol_4  0.026622            0             -0.229177      -0.043666                 0.110462
+2026-03-12   MDLZ         vol_1  0.026355            0              0.130838       0.142280                 0.110462
+2026-03-12    HBM         vol_4  0.024453            0             -0.016400       0.145080                 0.110462
+2026-03-12   VICI         vol_1  0.024402            0             -0.015820       0.021944                 0.110462
+2026-03-12     KO         vol_1  0.018749            0              0.011976       0.017384                 0.110462
+2026-03-12   TEVA         vol_2  0.017861            0              0.122572       0.219454                 0.110462
+2026-03-12    CVS         vol_3  0.016419            0              0.160930       0.190351                 0.110462
+2026-03-12    NLY         vol_1  0.016112            0             -0.010997       0.062235                 0.110462
+2026-03-12   VTRS         vol_2  0.013723            0              0.145983       0.244203                 0.110462
+2026-03-12   TSLA         vol_2 -0.069429            0             -0.145409       0.084403                 0.110462
+2026-03-12   PLTR         vol_4 -0.074769            0             -0.309409      -0.102280                 0.110462
+2026-03-12   SMCI         vol_4 -0.076717            0             -0.067753       0.144660                 0.110462
+2026-03-12    IOT         vol_4 -0.081462            0             -0.219983      -0.066541                 0.110462
+2026-03-12   DDOG         vol_4 -0.083947            0              0.429840       0.574080                 0.110462
+2026-03-12   SHOP         vol_4 -0.089552            0             -0.368853      -0.124911                 0.110462
+2026-03-12   OKLO         vol_5 -0.091301            0             -0.041377       0.216815                 0.110462
+2026-03-12   UUUU         vol_5 -0.092129            0             -0.038500       0.078708                 0.110462
+2026-03-12      U         vol_5 -0.092567            0              0.224198       0.449305                 0.110462
+2026-03-12   NVTS         vol_5 -0.094280            0              0.561144       0.823647                 0.110462
+2026-03-12   RKLB         vol_5 -0.095991            0              0.315470       0.542636                 0.110462
+2026-03-12    WDC         vol_5 -0.105679            0              0.638379       0.837813                 0.110462
+2026-03-12   SBSW         vol_5 -0.106704            0             -0.122927       0.005617                 0.110462
+2026-03-12   DELL         vol_4 -0.111233            0              0.537269       0.737442                 0.110462
+2026-03-12    GLW         vol_4 -0.112204            0              0.296429       0.440549                 0.110462
+2026-03-12   FSLY         vol_5 -0.112660            0             -0.306946      -0.153179                 0.110462
+2026-03-12   AMAT         vol_4 -0.113178            0              0.103957       0.291072                 0.110462
+2026-03-12    VXX         vol_4 -0.113612            0              0.145900      -0.185486                 0.110462
+2026-03-12    AMD         vol_4 -0.118026            0              1.064033       1.301962                 0.110462
+2026-03-12   RCAT         vol_5 -0.129991            0             -0.626841      -0.358292                 0.110462
+2026-03-12   MSTR         vol_5 -0.130221            0              0.127690       0.365880                 0.110462
+2026-03-12    CDE         vol_5 -0.133595            0             -0.284815      -0.144306                 0.110462
+2026-03-12   HOOD         vol_5 -0.140002            0             -0.268725       0.011955                 0.110462
+2026-03-12   COIN         vol_5 -0.148111            0             -0.198243       0.041039                 0.110462
+2026-03-12   LRCX         vol_4 -0.156650            0              0.184211       0.403647                 0.110462
+2026-03-12     AG         vol_5 -0.177149            0             -0.232131      -0.112464                 0.110462
+2026-03-12    APP         vol_5 -0.179241            0             -0.188305       0.042775                 0.110462
+2026-03-12    VRT         vol_5 -0.192514            0              0.048369       0.281374                 0.110462
+2026-03-12     BE         vol_5 -0.203714            0              0.445620       0.660813                 0.110462
+2026-03-12     MU         vol_5 -0.228691            0              0.602638       0.843157                 0.110462
