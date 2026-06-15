@@ -22,7 +22,7 @@ from lightgbm import LGBMRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 import optuna
 
-from scripts.config import DATA_DIR, MODEL_DIR
+from scripts.config import DATA_DIR, MODEL_DIR, ROOT_DIR
 from scripts.data_management import load_data
 import scripts.indicators  # noqa: F401
 
@@ -110,6 +110,7 @@ class TrainingManager:
         self.y_train = None
         self.y_test = None
 
+########################################################################################################################
     # Hypers
     def _make_tuning_split(self, validation_size: float = 0.2):
         unique_dates = np.array(sorted(pd.to_datetime(self.train_df["Date"]).unique()))
@@ -137,8 +138,7 @@ class TrainingManager:
 
         return cagr + 0.05 * sharpe - 0.50 * max_drawdown - 0.002 * turnover
 
-    def _keep_top_results(self, top_results: list[dict[str, Any]], result: dict[str, Any], top_k: int = 3) -> list[
-        dict[str, Any]]:
+    def _keep_top_results(self, top_results: list[dict[str, Any]], result: dict[str, Any], top_k: int = 3) -> list[dict[str, Any]]:
         top_results.append(result)
         top_results.sort(key=lambda r: r["score"], reverse=True)
         return top_results[:top_k]
@@ -383,8 +383,7 @@ class TrainingManager:
 
         return True
 
-    ####################################
-
+########################################################################################################################
 
     @staticmethod
     def add_forward_excess_target(df: pd.DataFrame, benchmark_close: pd.Series, horizon: int, beta: float = 1.0) -> pd.DataFrame:
@@ -405,8 +404,7 @@ class TrainingManager:
         with open(os.path.join(DATA_DIR, "ticker_attr.json"), "r") as f:
             ticker_map = json.load(f)
 
-        ticker_list = sorted(set(ticker_map.keys()))[:100]
-        # self.config.edge_q = min(self.config.edge_q * len(ticker_list), self.config.max_top_tickers) / len(ticker_list)
+        ticker_list = sorted(set(ticker_map.keys()))#[:100]
 
         benchmark_raw = pd.read_parquet(os.path.join(DATA_DIR, f"SPY_{interval}.parquet"))
         benchmark_raw.index.name = "Date"
@@ -499,12 +497,11 @@ class TrainingManager:
         log(f"Test rows: {len(self.test_df):,}")
         log(f"Split date: {pd.Timestamp(self.split_date).strftime('%Y-%m-%d')}")
 
-    def _effective_edge_q(self, df: pd.DataFrame, max_top_tickers: int | None = None) -> float:
-        max_top_tickers = max_top_tickers or self.config.max_top_tickers
+    def _effective_edge_q(self, df: pd.DataFrame) -> float:
         n_tickers = max(1, df["ticker"].nunique())
-        return min(self.config.edge_q, max_top_tickers / n_tickers)
+        return min(self.config.edge_q, self.config.max_top_tickers / n_tickers)
 
-    def add_cross_sectional_signals(self, df: pd.DataFrame, pred_col: str, group_cols: list | None = None, max_top_tickers: int | None = None,  allow_short: bool | None = None) -> pd.DataFrame:
+    def add_cross_sectional_signals(self, df: pd.DataFrame, pred_col: str, group_cols: list | None = None, allow_short: bool | None = None) -> pd.DataFrame:
         df = df.copy()
         df["pred_signal"] = 0
 
@@ -512,7 +509,7 @@ class TrainingManager:
             group_cols = ["Date", "profile_group"]
 
         allow_short = self.config.allow_short if allow_short is None else allow_short
-        edge_q = self._effective_edge_q(df, max_top_tickers)
+        edge_q = self._effective_edge_q(df)
 
         for _, group in df.groupby(group_cols):
             if len(group) < 5:
@@ -530,7 +527,7 @@ class TrainingManager:
 
         return df
 
-    def _apply_signals(self, test_df: pd.DataFrame, pred: np.ndarray | None = None, max_top_tickers: int | None = None, allow_short: bool | None = None) -> pd.DataFrame:
+    def _apply_signals(self, test_df: pd.DataFrame, pred: np.ndarray | None = None) -> pd.DataFrame:
         out = test_df.copy()
 
         if pred is not None:
@@ -540,11 +537,7 @@ class TrainingManager:
             out,
             "pred",
             ["Date", "profile_group"],
-            max_top_tickers=max_top_tickers,
-            allow_short=allow_short,
         )
-
-
 
     def evaluate_strategy(self, df: pd.DataFrame) -> dict[str, Any]:
         trades = df[df["pred_signal"] != 0].copy()
@@ -597,10 +590,10 @@ class TrainingManager:
             }
 
         return {
-            "trade_rate": float((df["pred_signal"] != 0).mean()),
-            "long_rate": float((df["pred_signal"] == 1).mean()),
-            "short_rate": float((df["pred_signal"] == -1).mean()),
-            "hit_rate": float((trades["strategy_return"] > 0).mean()),
+            "trade_rate": float((df["pred_signal"] != 0).mean()),  # noqa
+            "long_rate": float((df["pred_signal"] == 1).mean()),  # noqa
+            "short_rate": float((df["pred_signal"] == -1).mean()),  # noqa
+            "hit_rate": float((trades["strategy_return"] > 0).mean()),  # noqa
             "mean_return": float(mean_return),
             "median_return": float(trades["strategy_return"].median()),
             "sharpe_like": float((mean_return / std_return) * np.sqrt(252 / self.config.horizon)),
@@ -632,15 +625,8 @@ class TrainingManager:
 
         return results
 
-
-    def _daily_candidate_pool(self, day: pd.DataFrame, max_top_tickers: int, allow_short: bool) -> pd.DataFrame:
-        signalled = self.add_cross_sectional_signals(
-            day,
-            "pred",
-            ["Date", "profile_group"],
-            max_top_tickers=max_top_tickers,
-            allow_short=allow_short,
-        )
+    def _daily_candidate_pool(self, day: pd.DataFrame) -> pd.DataFrame:
+        signalled = self.add_cross_sectional_signals(day, "pred", ["Date", "profile_group"])
 
         candidates = signalled[signalled["pred_signal"] != 0].copy()
         if candidates.empty:
@@ -654,13 +640,11 @@ class TrainingManager:
 
         return candidates.sort_values("score", ascending=False)
 
-    def evaluate_rotating_portfolio(self, base_df: pd.DataFrame, max_top_tickers: int | None = None, allow_short: bool | None = None) -> dict[str, Any]:
-        max_top_tickers = max_top_tickers or self.config.max_top_tickers
-        allow_short = self.config.allow_short if allow_short is None else allow_short
+    def evaluate_rotating_portfolio(self, base_df: pd.DataFrame) -> dict:
         max_holding_days = self.config.horizon
 
         cost = self.config.cost_bps / 10_000
-        max_positions = max_top_tickers
+        max_positions = self.config.max_top_tickers
 
         df = base_df.copy()
         df = df.sort_values(["ticker", "Date"])
@@ -687,16 +671,10 @@ class TrainingManager:
                 day,
                 "pred",
                 ["Date", "profile_group"],
-                max_top_tickers=max_top_tickers,
                 allow_short=True,
             ).set_index("ticker", drop=False)
 
-            candidates = self._daily_candidate_pool(
-                day,
-                max_top_tickers=max_top_tickers,
-                allow_short=allow_short,
-            )
-
+            candidates = self._daily_candidate_pool(day)
             turnover = 0
 
             # Exit holdings that disappeared, became weak, hit max age, or got opposite signal.
@@ -809,80 +787,17 @@ class TrainingManager:
             "portfolio_avg_turnover": float(np.mean(daily_turnover)),
         }
 
-    def evaluate_top_n_variants(self, base_df: pd.DataFrame, max_top_values: list[int], allow_short: bool | None = None) -> dict[str, Any]:
-        results = {}
-
-        for max_top in max_top_values:
-            scored_df = self._apply_signals(
-                base_df,
-                pred=None,
-                max_top_tickers=max_top,
-                allow_short=allow_short,
-            )
-
-            row_metrics = self.evaluate_strategy(scored_df)
-            portfolio_metrics = self.evaluate_rotating_portfolio(
-                base_df,
-                max_top_tickers=max_top,
-                allow_short=allow_short,
-            )
-
-            results[f"top_{max_top}"] = {
-                **row_metrics,
-                "portfolio": portfolio_metrics,
-            }
-
-        return results
-
-
-
-    @staticmethod
-    def _get_lgbm_params(hyperparams: dict) -> dict:
-        lgbm_params = dict(hyperparams.get("LGBM", {}).get("best_params", {}))
-
-        defaults = {
-            "n_estimators": 700,
-            "learning_rate": 0.025,
-            "max_depth": 5,
-            "num_leaves": 31,
-            "min_child_samples": 50,
-            "subsample": 0.8,
-            "colsample_bytree": 0.8,
-            "reg_alpha": 0.1,
-            "reg_lambda": 1.0,
-            "objective": "regression",
-        }
+    def _train_lightgbm(self, interval: str) -> dict:
+        with open(os.path.join(ROOT_DIR, "results", f"lgbm_params_{interval}.json"), "r") as f:
+            params = json.load(f)
 
         if Settings.GPU["LGBM"]:
-            defaults.update({"device_type": "gpu", "gpu_platform_id": 0, "gpu_device_id": 0})
-
+            params.update({"device_type": "gpu", "gpu_platform_id": 0, "gpu_device_id": 0})
         if Settings.Threaded:
-            defaults.update({"num_threads": -1, "n_jobs": -1})
+            params.update({"num_threads": -1, "n_jobs": -1})
+        params.update({"objective": "regression"})
 
-        defaults.update(lgbm_params)
-        return defaults
-
-    @staticmethod
-    def _get_cat_params(hyperparams: dict) -> dict:
-        cat_params = dict(hyperparams.get("CAT", {}).get("best_params", {}))
-
-        defaults = {
-            "iterations": 700,
-            "learning_rate": 0.025,
-            "depth": 6,
-            "l2_leaf_reg": 3.0,
-            "loss_function": "RMSE",
-            "allow_writing_files": False,
-            "task_type": "GPU" if Settings.GPU["CAT"] else "CPU",
-        }
-
-        defaults.update(cat_params)
-        return defaults
-
-    def _train_lightgbm(self, hyperparams: dict, max_top_values: list[int]) -> dict[str, Any]:
-        params = self._get_lgbm_params(hyperparams)
         model = LGBMRegressor(random_state=self.seed, verbose=-1, **params)
-
         model.fit(self.X_train, self.y_train)
 
         pred = model.predict(self.X_test)
@@ -893,7 +808,6 @@ class TrainingManager:
         scored_df = self._apply_signals(base_df)
         strategy_metrics = self.evaluate_strategy(scored_df)
         portfolio_metrics = self.evaluate_rotating_portfolio(base_df)
-        variants = self.evaluate_top_n_variants(base_df, max_top_values)
 
         return {
             "type": "LGBM",
@@ -904,13 +818,19 @@ class TrainingManager:
             "rmse": float(mean_squared_error(self.y_test, pred) ** 0.5),
             **strategy_metrics,
             "portfolio": portfolio_metrics,
-            "top_n_variants": variants,
         }
 
-    def _train_catboost(self, hyperparams: dict, max_top_values: list[int]) -> dict[str, Any]:
-        params = self._get_cat_params(hyperparams)
-        model = CatBoostRegressor(random_seed=self.seed, verbose=False, **params)
+    def _train_catboost(self, interval: str) -> dict:
+        with open(os.path.join(ROOT_DIR, "results", f"cat_params_{interval}.json"), "r") as f:
+            params = json.load(f)
 
+        if Settings.GPU["LGBM"]:
+            params.update({"device_type": "gpu", "gpu_platform_id": 0, "gpu_device_id": 0})
+        if Settings.Threaded:
+            params.update({"num_threads": -1, "n_jobs": -1})
+        params.update({"objective": "regression"})
+
+        model = CatBoostRegressor(random_seed=self.seed, verbose=False, **params)
         model.fit(self.X_train, self.y_train)
 
         pred = model.predict(self.X_test)
@@ -921,7 +841,6 @@ class TrainingManager:
         scored_df = self._apply_signals(base_df)
         strategy_metrics = self.evaluate_strategy(scored_df)
         portfolio_metrics = self.evaluate_rotating_portfolio(base_df)
-        variants = self.evaluate_top_n_variants(base_df, max_top_values)
 
         return {
             "type": "CAT",
@@ -932,7 +851,6 @@ class TrainingManager:
             "rmse": float(mean_squared_error(self.y_test, pred) ** 0.5),
             **strategy_metrics,
             "portfolio": portfolio_metrics,
-            "top_n_variants": variants,
         }
 
     def _save_model_assets(self, interval, results: dict, baselines: dict):
@@ -993,16 +911,12 @@ class TrainingManager:
             self.config.horizon = 30
             self.config.max_top_tickers = 10
 
-        hyperparams = {}
-
         save_folder = os.path.join(MODEL_DIR, f"Profile ({interval})")
         if all_model_assets_exist(save_folder) and not force_train:
             log_update(f"Universe model already trained: {save_folder}")
             return True
 
         if os.path.exists(save_folder): shutil.rmtree(save_folder)
-
-        t0 = time.perf_counter()
 
         log_update("Building universe dataframe...")
         data = self._build_universe_frame(interval)
@@ -1017,12 +931,12 @@ class TrainingManager:
         results = {}
 
         log_update("Training LightGBM...")
-        results["LGBM"] = self._train_lightgbm(hyperparams, [5,10,20,30])
+        results["LGBM"] = self._train_lightgbm(interval)
         flush_memory()
         log(json.dumps({k: v for k, v in results["LGBM"].items() if k not in {"model", "test_df", "base_df"}}, indent=4))
 
         log_update("Training CatBoost...")
-        results["CAT"] = self._train_catboost(hyperparams, [5,10,20,30])
+        results["CAT"] = self._train_catboost(interval)
         flush_memory()
         log(json.dumps({k: v for k, v in results["CAT"].items() if k not in {"model", "test_df", "base_df"}}, indent=4))
 
@@ -1035,7 +949,6 @@ class TrainingManager:
         log(f"Best model by sharpe_like: {best_model_type}")
         log("Latest ranked predictions:")
         log(latest.to_string(index=False))
-        log(f"Total time: {time.perf_counter() - t0:.1f}s")
 
         return True
 
@@ -1052,9 +965,9 @@ if __name__ in "__main__":
 
     print("Training...")
     manager = TrainingManager()
-    manager.run_tuning_pipeline("1d")
+    manager.run_training_pipeline("1d")
 
-    manager = TrainingManager()
-    manager.run_tuning_pipeline("1h")
+    # manager = TrainingManager()
+    # manager.run_training_pipeline("1h")
 
-    print(time.perf_counter() - start)
+    print(f"Total time: {time.perf_counter() - start:.1f}s")

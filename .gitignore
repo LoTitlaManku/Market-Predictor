@@ -10,7 +10,6 @@ models/
 ledgers*/
 .bin/
 plots/
-results/
 scripts/catboost_info/
 
 # UV and others

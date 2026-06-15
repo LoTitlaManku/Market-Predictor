@@ -1,0 +1,92 @@
+[
+    {
+        "trial": 14,
+        "score": 0.3098263985196077,
+        "params": {
+            "iterations": 1200,
+            "learning_rate": 0.034760236298790596,
+            "depth": 5,
+            "l2_leaf_reg": 7.0,
+            "random_strength": 1.0,
+            "bagging_temperature": 1.0,
+            "border_count": 128
+        },
+        "mae": 0.08473366265525935,
+        "rmse": 0.12103239636421045,
+        "rank_ic_mean": 0.0796189900987195,
+        "hit_rate": 0.5387680049034631,
+        "median_return": 0.010393865566669757,
+        "portfolio": {
+            "portfolio_days": 1336,
+            "portfolio_total_return": 3.598187594060297,
+            "portfolio_cagr_like": 0.3334567240671864,
+            "portfolio_sharpe_like": 1.6490491330333048,
+            "portfolio_max_drawdown": -0.20727634284160168,
+            "portfolio_win_rate": 0.5508982035928144,
+            "portfolio_mean_daily_return": 0.0012102862496992622,
+            "portfolio_median_daily_return": 0.0011893892221526254,
+            "portfolio_avg_holdings": 10.493263473053892,
+            "portfolio_avg_turnover": 1.222305389221557
+        }
+    },
+    {
+        "trial": 15,
+        "score": 0.30524815905330505,
+        "params": {
+            "iterations": 1200,
+            "learning_rate": 0.035228458311564854,
+            "depth": 5,
+            "l2_leaf_reg": 7.0,
+            "random_strength": 1.0,
+            "bagging_temperature": 1.0,
+            "border_count": 128
+        },
+        "mae": 0.08457336579956189,
+        "rmse": 0.12115050601411523,
+        "rank_ic_mean": 0.07793101154879555,
+        "hit_rate": 0.544104134762634,
+        "median_return": 0.011541333637053628,
+        "portfolio": {
+            "portfolio_days": 1336,
+            "portfolio_total_return": 3.5508691309701845,
+            "portfolio_cagr_like": 0.3308575367656592,
+            "portfolio_sharpe_like": 1.702129779370154,
+            "portfolio_max_drawdown": -0.21690179324196324,
+            "portfolio_win_rate": 0.5568862275449101,
+            "portfolio_mean_daily_return": 0.001196939085393448,
+            "portfolio_median_daily_return": 0.00102297811001521,
+            "portfolio_avg_holdings": 10.508982035928144,
+            "portfolio_avg_turnover": 1.1324850299401197
+        }
+    },
+    {
+        "trial": 41,
+        "score": 0.2628098645746631,
+        "params": {
+            "iterations": 1000,
+            "learning_rate": 0.04370115018657769,
+            "depth": 7,
+            "l2_leaf_reg": 5.0,
+            "random_strength": 3.0,
+            "bagging_temperature": 1.0,
+            "border_count": 254
+        },
+        "mae": 0.08522135541958673,
+        "rmse": 0.12205933020083203,
+        "rank_ic_mean": 0.08897583785044406,
+        "hit_rate": 0.5539447581260492,
+        "median_return": 0.011240157854367602,
+        "portfolio": {
+            "portfolio_days": 1336,
+            "portfolio_total_return": 3.0098134767925186,
+            "portfolio_cagr_like": 0.2994600804292491,
+            "portfolio_sharpe_like": 1.5832778311157925,
+            "portfolio_max_drawdown": -0.22708929266506261,
+            "portfolio_win_rate": 0.5501497005988024,
+            "portfolio_mean_daily_return": 0.001100773254080791,
+            "portfolio_median_daily_return": 0.0009727224824089488,
+            "portfolio_avg_holdings": 10.752994011976048,
+            "portfolio_avg_turnover": 1.1347305389221556
+        }
+    }
+]

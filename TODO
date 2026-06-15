@@ -18,3 +18,12 @@ nohup uv run -m scripts.predictor > training.log 2>&1 &
 ps aux | grep predictor
 
 cat training.log
+
+
+
+tar     --exclude='.git'     --exclude='.venv'     --exclude='cache_files'     --exclude='__pycache__'     --exclude='*.pyc'     -czvf ../Market-Predictor.tar.gz .
+
+gcloud compute scp     god@instance-20260613-180406:~/Market-Predictor.tar.gz     .
+
+rm -f testing.txt training.log *.db *_params_*.json *_top_results_*.json
+
