@@ -1,0 +1,30 @@
+{
+    "interval": "1h",
+    "model_type": "ENSEMBLE",
+    "months_back": 1,
+    "cutoff_date": "2026-05-15",
+    "start_date": "2026-05-18",
+    "end_date": "2026-06-15",
+    "initial_capital": 1000.0,
+    "final_equity": 1037.95655176708,
+    "profit_loss": 37.9565517670801,
+    "total_return": 0.03795655176708013,
+    "cagr_like": 0.5561081164673105,
+    "sharpe_like": 1.100573791018074,
+    "max_drawdown": -0.17379101057585455,
+    "win_rate": 0.5072463768115942,
+    "mean_daily_return": 0.00035468853890083756,
+    "median_daily_return": 5.7832288768619515e-05,
+    "avg_holdings": 9.115942028985508,
+    "avg_turnover": 1.108695652173913,
+    "trade_count": 153,
+    "attribution_concentration": {
+        "total_positive_pnl": 173.6412521016012,
+        "top_1_pnl": 34.356543238280274,
+        "top_3_pnl": 73.73060942202801,
+        "top_5_pnl": 100.54352016524271,
+        "top_1_share_of_positive_pnl": 0.19785933827623822,
+        "top_3_share_of_positive_pnl": 0.42461459203764934,
+        "top_5_share_of_positive_pnl": 0.5790301495085544
+    }
+}

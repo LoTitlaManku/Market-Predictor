@@ -6,7 +6,6 @@
 
 # Local storage
 cache_files/
-ledgers*/
 .bin/
 scripts/catboost_info/
 
