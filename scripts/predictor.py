@@ -831,10 +831,8 @@ class Predictor:
 
     def save_models(self, results: dict):
         local_now = pd.Timestamp.now().strftime('%Y-%m-%d %H:%M')
-        save_folder = Path(MODEL_DIR) / f"{self.interval} Models"
-
-        model_folder = save_folder / "models" / f"{local_now}"
-        predictions_folder = save_folder / "predictions"
+        model_folder = Path(MODEL_DIR) / "models" / f"{local_now}"
+        predictions_folder = Path(MODEL_DIR) / "predictions"
 
         model_folder.mkdir(parents=True, exist_ok=True)
         predictions_folder.mkdir(parents=True, exist_ok=True)
@@ -857,27 +855,26 @@ class Predictor:
             else:
                 joblib.dump(model, model_folder / f"{model_type}_model.joblib")
 
-        joblib.dump(self.feature_cols, save_folder / "features.joblib")
+        joblib.dump(self.feature_cols, model_folder / "features.joblib")
 
-        metadata_path = save_folder / "metadata.json"
+        metadata_path = model_folder / "metadata.json"
         metadata_path.write_text(json.dumps(json_safe(metadata), indent=4), encoding="utf-8")
 
     def load_models(self, load_model: str = "latest") -> dict:
-        save_folder = Path(MODEL_DIR) / f"{self.interval} Models"
-        models_root = save_folder / "models"
+        models_root = Path(MODEL_DIR) / "models"
 
         if load_model == "latest":
             model_folders = sorted([p for p in models_root.iterdir() if p.is_dir()])
             if not model_folders: raise FileNotFoundError(f"No saved models found in {models_root}")
             model_folder = model_folders[-1]
         else:
-            model_folder = Path(MODEL_DIR) / "models" / load_model
+            model_folder = models_root / load_model
             if not model_folder.exists():
                 raise FileNotFoundError(f"Model folder does not exist: {model_folder}")
 
-        self.feature_cols = joblib.load(save_folder / "features.joblib")
+        self.feature_cols = joblib.load(model_folder / "features.joblib")
 
-        metadata_path = save_folder / "metadata.json"
+        metadata_path = model_folder / "metadata.json"
         if metadata_path.exists():
             metadata = json.loads(metadata_path.read_text())
             self.split_date = pd.Timestamp(metadata.get("end_date"))
@@ -918,8 +915,6 @@ class Predictor:
         return df
 
     def predict_latest(self, data_dict: dict, models: dict) -> pd.DataFrame:
-        save_folder = Path(MODEL_DIR) / f"{self.interval} Models"
-
         log("Building latest prediction universe...")
         pred_data = self.datamanager.build_universe(self.interval, data_dict, drop_unlabelled=False)
         pred_data = self._prepare_data(pred_data, train=False)
@@ -949,9 +944,7 @@ class Predictor:
         ]
         picks = picks[[c for c in cols if c in picks.columns]]
 
-        pred_dir = Path(save_folder) / "predictions"
-        pred_dir.mkdir(parents=True, exist_ok=True)
-
+        pred_dir = Path(MODEL_DIR) / "predictions"
         date_str = pd.Timestamp(latest_date).strftime("%Y-%m-%d")
 
         latest.to_parquet(pred_dir / f"all_predictions_{self.interval}_{date_str}.parquet", index=False)
@@ -1010,13 +1003,11 @@ class Predictor:
 if __name__ == "__main__":
     start = time.perf_counter()
 
-    cfg = UniverseConfig()
-
     print("Training...")
     # mng = TrainingManager()
     # mng.run_pipeline("1d")
 
-    trainer = Trainer("1d", cfg)
+    trainer = Trainer("1d")
     for mon in [3,6,12]:
         trainer.run_training(months_back=mon)
 
