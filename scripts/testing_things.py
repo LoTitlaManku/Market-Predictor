@@ -159,33 +159,31 @@ def get_special(key):
     from datetime import datetime, timezone
     from data_management import NYSE_CAL
 
-    for interval in ["1h", "1d"]:
-        data = yf.download(key, interval=interval, period="max", auto_adjust=False, progress=True)
+    data = yf.download(key, interval="1d", period="max", auto_adjust=False, progress=True)
+    # data = pd.read_parquet(os.path.join(DATA_DIR, f"{key}_1d.parquet"))
 
-        if data.empty or data is None:
-            print(f"Empty data: {key} - {interval}")
-            continue
+    if data.empty or data is None:
+        print(f"Empty data: {key} - 1d")
+        return
 
-        # Flattens columns if MultiIndex
-        if isinstance(data.columns, pd.MultiIndex):
-            cols: pd.MultiIndex = data.columns
-            data.columns = cols.get_level_values(0)
+    # Flattens columns if MultiIndex
+    if isinstance(data.columns, pd.MultiIndex):
+        cols: pd.MultiIndex = data.columns
+        data.columns = cols.get_level_values(0)
 
-        data.index = pd.to_datetime(data.index, utc=True).tz_localize(None)
-        data.index.name = "Date"
+    data.index = pd.to_datetime(data.index, utc=True).tz_localize(None)
+    data.index.name = "Date"
 
-        # now_utc_naive = datetime.now(timezone.utc).replace(tzinfo=None)
-        # schedule = NYSE_CAL.schedule(start_date=now_utc_naive, end_date=now_utc_naive)
-        # if not schedule.empty:
-        #     mkt_open = schedule.iloc[0]['market_open'].replace(tzinfo=None)
-        #     mkt_close = schedule.iloc[0]['market_close'].replace(tzinfo=None)
-        #
-        #     # If we are currently between open and close, the last downloaded row is "Live"
-        #     if mkt_open <= now_utc_naive <= mkt_close:
-        #         data = data.iloc[:-1]
+    now_utc_naive = datetime.now(timezone.utc).replace(tzinfo=None)
+    schedule = NYSE_CAL.schedule(start_date=now_utc_naive, end_date=now_utc_naive)
+    if not schedule.empty:
+        mkt_close = schedule.iloc[0]['market_close'].replace(tzinfo=None)
 
-        # data.to_parquet(os.path.join(DATA_DIR, f"{key}_{interval}.parquet"))
-        # data.to_parquet(os.path.join(HYPER_DIR, "Profile F", f"{key}_{interval}.parquet"))
+        # If we are currently before close, the last downloaded row is "Live"
+        if now_utc_naive <= mkt_close:
+            data = data.iloc[:-1]
+
+    data.to_csv(os.path.join(DATA_DIR, f"{key}_1d.csv"))
 
 ########################################################################################################################
 
@@ -283,24 +281,29 @@ def updates(sent: bool = False, spy: bool = False, cache: bool = False):
         print(f"--- Updating Prices for tickers ---")
         updater.data_updater()
 
+########################################################################################################################
 
 if __name__ in "__main__":
     import time
     start = time.perf_counter()
 
-    # updates(  # Whether to update:
-    #     sent=True,  # News sentiment
-    #     spy=False,  # Market sentiment indicators
-    #     cache=False,  # Stock cache
-    # )
+    # import time_machine
+    # from datetime import datetime, timezone
+    # target_time = datetime(2026, 6, 10, 15, 0, 0, tzinfo=timezone.utc)
+    # with time_machine.travel(target_time):
+    #     f()
+
+    updates(  # Whether to update:
+        sent=True,  # News sentiment
+        spy=True,  # Market sentiment indicators
+        cache=True,  # Stock cache
+    )
     # find_latest()
 
-    # from predictor import TrainingManager
-    # print("Training...")
-    # success = TrainingManager().run_training_pipeline("AAPL", "1d", force_train=True)
-    # print(success)
-    # print("Predicting...")
-    # run_prediction_pipeline("AAPL", "1d")
+    from predictor import Predictor
+    print("Training...")
+    mng = Predictor("1d")
+    mng.run_pipeline()
 
     # from folder_trees import generate_tree
     # generate_tree("/home/god/Projects/market_predictor", ignore_paths=[".bin", ".venv", "cache_files", "imgs"])

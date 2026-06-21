@@ -8,6 +8,7 @@
 cache_files/
 .bin/
 scripts/catboost_info/
+model/models/
 
 # UV and others
 uv.lock

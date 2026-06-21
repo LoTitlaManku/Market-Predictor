@@ -519,14 +519,17 @@ class Trainer:
         log(f"Latest available date: {latest_date.strftime('%Y-%m-%d')}")
         log(f"Cutoff date: {cutoff_date.strftime('%Y-%m-%d')}")
 
+        # Construct training universe up to the split date
         log("Building training universe up to cutoff...")
         train_data = self.manager.build_universe(self.interval, data_dict, True, cutoff_date)
 
+        # Construct full evaluation dataset across entire timeline
         log("Building full universe for walk-forward predictions...")
         full_data = self.manager.build_universe(self.interval, data_dict, False)
 
         walk_df = self.prepare_predictor(train_data, full_data, cutoff_date)
 
+        # Slice features for walk-forward out-of-sample predictions
         self.config.max_top_tickers = 20
         X_walk = walk_df[self.predictor.feature_cols].to_numpy(dtype=np.float32)
         walk_df = walk_df.copy()
@@ -537,9 +540,11 @@ class Trainer:
         log("Training LGBM up to cutoff...")
         lgbm_model = self.predictor.train_model("LGBM")
 
+        # Generate predictions across the walk-forward window
         walk_df["pred_cat"] = cat_model.predict(X_walk)
         walk_df["pred_lgbm"] = lgbm_model.predict(X_walk)
 
+        # Merge model scores and calculate execution returns
         walk_df = self.predictor.add_ensemble_predictions(walk_df)
         walk_df = self.add_returns(walk_df, data_dict)
 
@@ -553,20 +558,26 @@ class Trainer:
         trade_rows = []
         position_rows = []
         for date in dates[:-1]:
+            # Get predictions/returns for this date and drop invalid records
             day = by_date[date].copy()
             day = day.dropna(subset=["pred", "exec_return", "exec_entry_price_mid", "exec_exit_price_mid"])
             if day.empty: continue
 
+            # Build signal table for the day
             exit_signal_day = self.manager.add_signals(day, allow_short=True).set_index("ticker", drop=False)
-
             signalled = self.manager.add_signals(day)
             candidates = signalled[signalled["pred_signal"] != 0].copy()
+
+            # Sort entry candidates based on directional confidence strength
             if not candidates.empty:
                 candidates["score"] = np.where(candidates["pred_signal"] == 1, candidates["pred"], -candidates["pred"])
                 candidates = candidates.sort_values("score", ascending=False)
 
             turnover = 0
+
+            # Scan and manage open portfolio positions
             for ticker in list(holdings.keys()):
+                # Liquidate if ticker drops out of the target universe
                 if ticker not in exit_signal_day.index:
                     holdings.pop(ticker)
                     turnover += 1
@@ -577,11 +588,13 @@ class Trainer:
                 side = holdings[ticker]["side"]
                 age = holdings[ticker]["age"]
 
+                # Check if position breaks risk limits or holding constraints
                 opposite_signal = row["pred_signal"] == -side
                 weak_long = side == 1 and row["pred"] <= self.config.exit_pred_threshold
                 weak_short = side == -1 and row["pred"] >= -self.config.exit_pred_threshold
                 too_old = age >= self.config.horizon
 
+                # Exit if signal has flipped, weakened, disappeared, or holding is too old
                 if opposite_signal or weak_long or weak_short or too_old:  # noqa
                     holdings.pop(ticker)
                     turnover += 1
@@ -591,16 +604,19 @@ class Trainer:
                         "weak_long": bool(weak_long), "weak_short": bool(weak_short), "too_old": bool(too_old),
                     })
 
+            # Process new portfolio trade entries and allocations
             for _, row in candidates.iterrows():
                 ticker = row["ticker"]
                 side = int(row["pred_signal"])
                 score = float(row["score"])
 
+                # If already held, just refresh its score
                 if ticker in holdings:
                     holdings[ticker]["score"] = score
                     holdings[ticker]["side"] = side
                     continue
 
+                # If portfolio has room, add the new candidate
                 if len(holdings) < self.config.max_top_tickers:
                     holdings[ticker] = {"side": side, "score": score, "age": 0}
                     turnover += 1
@@ -611,6 +627,7 @@ class Trainer:
                     })
                     continue
 
+                # If full, replace the weakest holding
                 weakest_ticker = min(holdings, key=lambda t: holdings[t]["score"])
                 weakest_score = holdings[weakest_ticker]["score"]
                 if score > weakest_score + self.config.replace_buffer:
@@ -627,12 +644,15 @@ class Trainer:
             day_indexed = day.set_index("ticker", drop=False)
             position_returns = []
             position_details = []
+
+            # Calculate one-day execution return for every open holding
             for ticker, info in holdings.items():
                 if ticker not in day_indexed.index: continue
 
                 row = day_indexed.loc[ticker]
                 side = int(info["side"])
 
+                # Use long or short execution prices depending on position side
                 if side == 1:
                     raw_return = row["long_exec_return"]
                     entry_price = row["long_entry_price"]
@@ -653,13 +673,16 @@ class Trainer:
                     "position_return": raw_return, "holding_age": int(info["age"]), "score": float(info["score"]),
                 })
 
+            # Equal-weight portfolio return for the day minus cost overhead
             gross_return = float(np.mean(position_returns)) if position_returns else 0.0
             turnover_cost = (self.config.cost_bps / 10_000) * turnover / max(1, self.config.max_top_tickers)
             daily_return = gross_return - turnover_cost
 
+            # Compute and apply compounded growth changes to total capital
             equity_before = equity
             equity *= 1.0 + daily_return
 
+            # Append performance context to position details tracking log
             if position_details:
                 weight = 1.0 / len(position_details)
 
@@ -670,6 +693,7 @@ class Trainer:
                     row["contribution_pnl"] = equity_before * contribution_return
                     position_rows.append(row)
 
+            # Store unified daily execution benchmarks
             daily_rows.append({
                 "Date": date,
                 "equity": equity,
@@ -681,32 +705,37 @@ class Trainer:
                 "held_tickers": ",".join(sorted(holdings.keys())),
             })
 
+            # Increment active position lifetime counters
             for info in holdings.values(): info["age"] += 1
 
+        # Consolidate matrix output logs into pandas dataframes
         daily_df = pd.DataFrame(daily_rows)
         trades_df = pd.DataFrame(trade_rows)
         position_df = pd.DataFrame(position_rows)
 
         if daily_df.empty: raise ValueError("Walk-forward produced no daily rows.")
 
+        # Sort aggregated performance results sequentially by timestamp
         daily_df["Date"] = pd.to_datetime(daily_df["Date"])
         daily_df = daily_df.sort_values("Date")
 
+        # Compute max drawdown curves and overall backtest performance
         returns = daily_df["daily_return"].astype(float)
         equity_curve = daily_df["equity"].astype(float)
-
         drawdown = equity_curve / equity_curve.cummax() - 1.0
         total_return = equity / 1000.0 - 1.0
 
+        # Configure time normalization metrics matching execution intervals
         multiplier = 6.5 if self.interval == "1h" else 1
         years = len(daily_df) / (252 * multiplier)
         annualiser = np.sqrt(252 * multiplier)
 
+        # Generate standardized portfolio tracking analytics
         cagr_like = (equity / 1000.0) ** (1 / years) - 1.0 if years > 0 else 0.0
-
         sharpe_like = returns.mean() / (returns.std() + 1e-9) * annualiser  # noqa
         attribution = self.analyse_pos_attr(position_df)
 
+        # Build output metadata dict package
         summary = {
             "interval": self.interval,
             "model_type": model_type,
@@ -730,6 +759,7 @@ class Trainer:
             "attribution_concentration": attribution["concentration"],
         }
 
+        # Save serialized simulation logs directly to workspace paths
         self.save_results(months_back, summary, daily_df, trades_df, position_df, attribution)
 
         log("Walk-forward summary:")
@@ -1003,12 +1033,12 @@ class Predictor:
 if __name__ == "__main__":
     start = time.perf_counter()
 
-    print("Training...")
-    # mng = TrainingManager()
-    # mng.run_pipeline("1d")
+    # print("Training...")
+    # mng = Predictor("1d")
+    # mng.run_pipeline()
 
-    trainer = Trainer("1d")
-    for mon in [3,6,12]:
-        trainer.run_training(months_back=mon)
+    # trainer = Trainer("1d")
+    # for mon in [3,6,12]:
+    #     trainer.run_training(months_back=mon)
 
     print(f"Total time: {time.perf_counter() - start:.1f}s")

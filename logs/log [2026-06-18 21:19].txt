@@ -1,0 +1,25 @@
+Loading raw data...
+
+
+Building universe dataframe...
+
+
+Preparing pooled features...
+Full training rows: 903,881
+Features: 66
+Latest labelled date: 2026-04-22
+Training LightGBM...
+Training CatBoost...
+Saving assets...
+Building latest prediction universe...
+
+
+Saved all predictions to: /home/god/Projects/market_predictor/model/predictions/all_predictions_1d_2026-06-18.parquet
+Saved paper signals to: /home/god/Projects/market_predictor/model/predictions/paper_signals_1d_2026-06-18.csv
+Paper trade picks:
+signal_date ticker  paper_action  target_weight     pred  pred_cat  pred_lgbm  ensemble_score  cat_rank_pct  lgbm_rank_pct
+ 2026-06-18   EOSE BUY_NEXT_OPEN            0.2 0.997357  0.260705   0.474719        0.997357      0.995595       1.000000
+ 2026-06-18   RCAT BUY_NEXT_OPEN            0.2 0.994714  0.269807   0.326407        0.994714      1.000000       0.986784
+ 2026-06-18   LUMN BUY_NEXT_OPEN            0.2 0.990308  0.215846   0.440054        0.990308      0.986784       0.995595
+ 2026-06-18   AMAT BUY_NEXT_OPEN            0.2 0.968282  0.211311   0.224463        0.968282      0.973568       0.960352
+ 2026-06-18   ACHR BUY_NEXT_OPEN            0.2 0.963877  0.166342   0.304128        0.963877      0.951542       0.982379

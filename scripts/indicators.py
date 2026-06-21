@@ -379,7 +379,7 @@ class TechnicalAnalysisAccessor:
         vvix_data = pd.read_parquet(os.path.join(DATA_DIR, f'VVIX_{interval}.parquet'))
         vvix_data.index.name = "Date"
         vvix_data.index = pd.to_datetime(vvix_data.index, utc=True).tz_localize(None)
-        vvix_data = vvix_data[~vvix_data.index.duplicated(keep='first')]
+        vvix_data = vvix_data[~vvix_data.index.duplicated(keep='first')].sort_index()
 
         aligned_vvix = vvix_data.reindex(df.index).ffill().bfill()
 
@@ -390,18 +390,45 @@ class TechnicalAnalysisAccessor:
 
     @staticmethod
     def _add_macro_context(df: pd.DataFrame, interval: str):
-        # Interest Rates (^TYX - 30 Year Yield)
-        tyx_data = pd.read_parquet(os.path.join(DATA_DIR, f'TYX_{interval}.parquet'))
-        tyx_data.index.name = "Date"
-        tyx_data.index = pd.to_datetime(tyx_data.index, utc=True).tz_localize(None)
-        tyx_data = tyx_data[~tyx_data.index.duplicated(keep='first')]
+        df = df.copy()
 
-        df = pd.merge_asof(
-            df,
-            tyx_data[['Adj Close']].rename(columns={'Adj Close': 'Treasury_30Y'}),
-            left_index=True,
-            right_index=True,
-            direction='backward'
+        df.index = pd.to_datetime(df.index, utc=True, errors="coerce").tz_localize(None)
+        df = df[df.index.notna()]
+        df = df[~df.index.duplicated(keep="first")].sort_index()
+
+        tyx_data = pd.read_parquet(os.path.join(DATA_DIR, f"TYX_{interval}.parquet"))
+        tyx_data.index.name = "Date"
+        tyx_data.index = pd.to_datetime(tyx_data.index, utc=True, errors="coerce").tz_localize(None)
+        tyx_data = tyx_data[tyx_data.index.notna()]
+        tyx_data = tyx_data[~tyx_data.index.duplicated(keep="first")].sort_index()
+
+        # Remove any weird future macro rows beyond this stock's available data
+        tyx_data = tyx_data.loc[tyx_data.index <= df.index.max()].copy()
+
+        left = (
+            df
+            .reset_index()
+            .rename(columns={df.index.name or "index": "Date"})
+            .sort_values("Date")
+            .reset_index(drop=True)
         )
 
-        return df
+        right = (
+            tyx_data[["Adj Close"]]
+            .rename(columns={"Adj Close": "Treasury_30Y"})
+            .reset_index()
+            .sort_values("Date")
+            .reset_index(drop=True)
+        )
+
+        merged = pd.merge_asof(
+            left,
+            right,
+            on="Date",
+            direction="backward",
+        )
+
+        merged = merged.set_index("Date")
+        merged["Treasury_30Y"] = merged["Treasury_30Y"].ffill()
+
+        return merged

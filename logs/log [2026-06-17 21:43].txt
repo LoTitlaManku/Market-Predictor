@@ -1,0 +1,23 @@
+Loading raw data...
+
+
+Building universe dataframe...
+
+
+Preparing pooled features...
+Full training rows: 903,487
+Features: 66
+Latest labelled date: 2026-04-21
+Training LightGBM...
+Training CatBoost...
+Saving assets...
+Building latest prediction universe...
+
+
+Saved all predictions to: /home/god/Projects/market_predictor/model/predictions/all_predictions_1d_2026-06-17.parquet
+Saved paper signals to: /home/god/Projects/market_predictor/model/predictions/paper_signals_1d_2026-06-17.csv
+Paper trade picks:
+signal_date ticker  paper_action  target_weight     pred  pred_cat  pred_lgbm  ensemble_score  cat_rank_pct  lgbm_rank_pct
+ 2026-06-17    AMD BUY_NEXT_OPEN       0.333333 0.991549  0.248087   0.158390        0.991549      1.000000       0.978873
+ 2026-06-17   LUMN BUY_NEXT_OPEN       0.333333 0.987324  0.199705   0.406929        0.987324      0.978873       1.000000
+ 2026-06-17    WDC BUY_NEXT_OPEN       0.333333 0.978873  0.230274   0.139767        0.978873      0.992958       0.957746
