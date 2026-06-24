@@ -295,15 +295,15 @@ if __name__ in "__main__":
 
     updates(  # Whether to update:
         sent=True,  # News sentiment
-        spy=True,  # Market sentiment indicators
-        cache=True,  # Stock cache
+        spy=False,  # Market sentiment indicators
+        cache=False,  # Stock cache
     )
-    # find_latest()
+    find_latest()
 
-    from predictor import Predictor
-    print("Training...")
-    mng = Predictor("1d")
-    mng.run_pipeline()
+    # from predictor import Predictor
+    # print("Training...")
+    # mng = Predictor("1d")
+    # mng.run_pipeline()
 
     # from folder_trees import generate_tree
     # generate_tree("/home/god/Projects/market_predictor", ignore_paths=[".bin", ".venv", "cache_files", "imgs"])

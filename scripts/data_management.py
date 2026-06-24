@@ -79,7 +79,7 @@ def get_day_close(date_to_check: pd.Timestamp | None = None) -> pd.Timestamp:
     day_times = [t for t in valid_times if t.date() == date_to_check.date()]
 
     # Return as Timestamp or None
-    return day_times[-1] if day_times else None # noqa
+    return day_times[-1].tz_localize(None) if day_times else None # noqa
 
 # Helper class to update data for downloaded stocks every 15 minutes
 class UpdateWorker:
@@ -150,13 +150,17 @@ class UpdateWorker:
             # Load existing cached stock data from file
             cache_file = os.path.join(DATA_DIR, f"{comparative.replace("^", "")}_1d.csv")
 
-            df = pd.read_csv(cache_file)
+            df = pd.read_csv(cache_file, index_col=0, parse_dates=True)
+            df.index = pd.to_datetime(df.index, utc=True, errors="coerce").tz_localize(None)
+            df = df[df.index.notna()]
             df.index.name = "Date"
-            df.index = pd.to_datetime(df.index, utc=True).tz_localize(None)
+
             df = df.loc[:, ~df.columns.duplicated()]
+            df = df[~df.index.duplicated(keep="last")]
+            df = df.sort_index()
 
             # Fetch for the period that has passed
-            start_date = pd.Timestamp(df.index[-1]) - pd.Timedelta(days=1)
+            start_date = df.index.max() - pd.Timedelta(days=5)
             new_data = yf.download(comparative, start=start_date, interval="1d", progress=False, auto_adjust=False)
             if new_data is None or new_data.empty: continue
 
@@ -164,6 +168,7 @@ class UpdateWorker:
                 new_data.columns = new_data.columns.get_level_values(0)
 
             new_data.index = pd.to_datetime(new_data.index, utc=True).tz_localize(None)
+            new_data = new_data[new_data.index.notna()]
             new_data.index.name = "Date"
 
             close = get_day_close(utc_now_naive())
@@ -188,14 +193,20 @@ class UpdateWorker:
         with open(os.path.join(DATA_DIR, "ticker_map.json"), "r") as f: ticker_map = json.load(f)
         with open(os.path.join(DATA_DIR, "valid_tickers_with_history.json"), "r") as f: company_tickers = json.load(f)
 
+        ticker_map = {
+            str(name).lower(): str(ticker).upper()
+            for name, ticker in ticker_map.items()
+        }
+
         sent_dir = os.path.join(DATA_DIR, "master_sentiment.parquet")
         sent_df = pd.read_parquet(sent_dir)
 
         sent_df["event_date"] = pd.to_datetime(sent_df["event_date"]).dt.normalize()
-        start_date = sent_df["event_date"].max() - pd.Timedelta(days=1) # noqa
+        # start_date = sent_df["event_date"].max() - pd.Timedelta(days=1) # noqa
+        start_date = pd.Timestamp(year=2015, month=1, day=1)
         end_date = utc_now_naive().normalize() + pd.Timedelta(days=1)
 
-        company_names = [name.lower() for name, ticker in ticker_map.items() if ticker in set(company_tickers)]
+        company_names = [name for name, ticker in ticker_map.items() if ticker in company_tickers]
         half = len(company_names) // 2
         regex_parts = [
             "|".join([rf"\b{re.escape(name)}\b" for name in company_names[:half]]),
@@ -211,7 +222,6 @@ class UpdateWorker:
                     AVG(CAST(SPLIT(V2Tone, ',')[OFFSET(0)] AS FLOAT64)) AS avg_tone,
                     COUNT(*) AS article_count
                 FROM
-                    -- Using the strictly partitioned table to save quota
                     `gdelt-bq.gdeltv2.gkg_partitioned`
                 WHERE
                     _PARTITIONTIME BETWEEN TIMESTAMP('{start_date}') AND TIMESTAMP('{end_date}')
@@ -219,7 +229,7 @@ class UpdateWorker:
                 GROUP BY
                     event_date, organizations
                 HAVING
-                    article_count > 2
+                    article_count > 0
                 ORDER BY
                     event_date ASC
             """
@@ -239,7 +249,7 @@ class UpdateWorker:
         new_df: pd.DataFrame = pd.concat(all_results, ignore_index=True)
         new_df['event_date'] = pd.to_datetime(new_df['event_date'])
 
-        new_df = new_df[new_df["event_date"] <= end_date] # noqa
+        new_df = new_df[new_df["event_date"] < utc_now_naive().normalize()] # noqa
 
         new_df['weighted_tone'] = new_df['avg_tone'] * new_df['article_count']
         new_df = new_df.groupby(['ticker', 'event_date']).agg({
@@ -257,8 +267,9 @@ class UpdateWorker:
         mux = pd.MultiIndex.from_product([company_tickers, market_days], names=['ticker', 'event_date'])
         full_df = full_df.set_index(['ticker', 'event_date']).reindex(mux).reset_index()
 
-        full_df['has_news'] = full_df['article_count'].notna().astype(int)
+        full_df["has_news"] = full_df["article_count"].fillna(0).gt(0).astype(int)
         full_df['article_count'] = full_df['article_count'].fillna(0)
         full_df['avg_tone'] = full_df['avg_tone'].fillna(0)
 
+        full_df = full_df[full_df["event_date"] < utc_now_naive().normalize()]  # noqa
         full_df.to_parquet(sent_dir, index=False)
