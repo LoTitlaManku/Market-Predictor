@@ -269,7 +269,7 @@ def find_latest():
     print(sent_df['event_date'].max())
 
 def updates(sent: bool = False, spy: bool = False, cache: bool = False):
-    from data_management import UpdateWorker
+    from scripts.data_management import UpdateWorker
     updater = UpdateWorker()
     if sent:
         print("--- Updating Global Sentiment ---")

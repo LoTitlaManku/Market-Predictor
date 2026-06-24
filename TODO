@@ -1,21 +1,12 @@
 
 
-daily:
-h=40
-tt=30
-
-hourly:
-h=30
-tt=10
-
-
 cd ~/Market-Predictor
 
-uv run -m scripts.predictor
+uv run -m scripts.testing_things
 
-nohup uv run -m scripts.predictor > training.log 2>&1 &
+nohup uv run -m scripts.testing_things > training.log 2>&1 &
 
-ps aux | grep predictor
+ps aux | grep testing_things
 
 cat training.log
 

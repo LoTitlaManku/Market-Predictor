@@ -184,9 +184,15 @@ class UpdateWorker:
 
     @staticmethod
     def sentiment_update():
+        import google.auth
         from google.cloud import bigquery # noqa
+
+        scopes = ["https://www.googleapis.com/auth/bigquery"]
+        credentials, project = google.auth.default(scopes=scopes)
+
         sent_client = bigquery.Client(
             project="lotitlamanku-market-predictor",
+            credentials=credentials,
             client_options={"quota_project_id": "lotitlamanku-market-predictor"}
         )
 
