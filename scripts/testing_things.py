@@ -281,6 +281,28 @@ def updates(sent: bool = False, spy: bool = False, cache: bool = False):
         print(f"--- Updating Prices for tickers ---")
         updater.data_updater()
 
+def repair_all_cache_csvs():
+    import os
+    import pandas as pd
+    from tqdm import tqdm
+    from scripts.config import CACHE_DIR
+
+    files = [f for f in os.listdir(CACHE_DIR) if f.endswith("_1d.csv")]
+
+    for filename in tqdm(files, desc="Cleaning cache"):
+        file_path = os.path.join(CACHE_DIR, filename)
+        df = pd.read_csv(file_path, index_col=0)
+
+        df.index = pd.to_datetime(df.index)
+        df = df.sort_index()
+
+        df['not_null_count'] = df.notnull().sum(axis=1)
+        df = df.sort_values(by=['not_null_count'], ascending=False)
+
+        df = df[~df.index.duplicated(keep='first')]
+        df = df.drop(columns=['not_null_count'])
+        df.to_csv(file_path)
+
 ########################################################################################################################
 
 if __name__ in "__main__":
@@ -293,17 +315,17 @@ if __name__ in "__main__":
     # with time_machine.travel(target_time):
     #     f()
 
-    updates(  # Whether to update:
-        sent=True,  # News sentiment
-        spy=False,  # Market sentiment indicators
-        cache=False,  # Stock cache
-    )
-    find_latest()
+    # updates(  # Whether to update:
+    #     sent=True,  # News sentiment
+    #     spy=True,  # Market sentiment indicators
+    #     cache=True,  # Stock cache
+    # )
+    # find_latest()
 
-    # from predictor import Predictor
-    # print("Training...")
-    # mng = Predictor("1d")
-    # mng.run_pipeline()
+    from predictor import Predictor
+    print("Training...")
+    mng = Predictor("1d")
+    mng.run_pipeline("latest")
 
     # from folder_trees import generate_tree
     # generate_tree("/home/god/Projects/market_predictor", ignore_paths=[".bin", ".venv", "cache_files", "imgs"])

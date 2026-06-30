@@ -98,7 +98,7 @@ class UpdateWorker:
             # Find the entry with the oldest modification time
             oldest_file = min(files, key=lambda e: e.stat().st_mtime)
             start_date = pd.Timestamp.fromtimestamp(os.path.getmtime(oldest_file.path), tz="UTC").tz_localize(None)
-            start_date -= pd.Timedelta(days=1)
+            start_date -= pd.Timedelta(days=5)
 
         # Download data
         shared._ERRORS = {}
@@ -208,8 +208,7 @@ class UpdateWorker:
         sent_df = pd.read_parquet(sent_dir)
 
         sent_df["event_date"] = pd.to_datetime(sent_df["event_date"]).dt.normalize()
-        # start_date = sent_df["event_date"].max() - pd.Timedelta(days=1) # noqa
-        start_date = pd.Timestamp(year=2015, month=1, day=1)
+        start_date = sent_df["event_date"].max() - pd.Timedelta(days=1) # noqa
         end_date = utc_now_naive().normalize() + pd.Timedelta(days=1)
 
         company_names = [name for name, ticker in ticker_map.items() if ticker in company_tickers]

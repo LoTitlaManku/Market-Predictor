@@ -1,0 +1,102 @@
+market_predictor
+├── TODO
+├── data
+│   ├── SPY_1d.csv
+│   ├── SPY_1d.parquet
+│   ├── SPY_1h.parquet
+│   ├── TYX_1d.csv
+│   ├── TYX_1d.parquet
+│   ├── TYX_1h.parquet
+│   ├── VIX_1d.csv
+│   ├── VIX_1d.parquet
+│   ├── VIX_1h.parquet
+│   ├── VVIX_1d.csv
+│   ├── VVIX_1d.parquet
+│   ├── VVIX_1h.parquet
+│   ├── master_sentiment.parquet
+│   ├── ticker_attr.json
+│   ├── ticker_map.json
+│   └── valid_tickers_with_history.json
+├── logs
+│   ├── log [2026-06-23 11:21].txt
+│   ├── log [2026-06-24 13:02].txt
+│   ├── log [2026-06-25 14:51].txt
+│   ├── log [2026-06-26 11:13].txt
+│   ├── log [2026-06-27 11:24].txt
+│   └── log [2026-06-29 23:02].txt
+├── model
+│   ├── models
+│   │   ├── 2026-06-23 11:24
+│   │   │   ├── cat_model.joblib
+│   │   │   ├── features.joblib
+│   │   │   ├── lgbm_model.joblib
+│   │   │   ├── lgbm_model.txt
+│   │   │   └── metadata.json
+│   │   ├── 2026-06-25 14:54
+│   │   │   ├── cat_model.joblib
+│   │   │   ├── features.joblib
+│   │   │   ├── lgbm_model.joblib
+│   │   │   ├── lgbm_model.txt
+│   │   │   └── metadata.json
+│   │   ├── 2026-06-26 11:15
+│   │   │   ├── cat_model.joblib
+│   │   │   ├── features.joblib
+│   │   │   ├── lgbm_model.joblib
+│   │   │   ├── lgbm_model.txt
+│   │   │   └── metadata.json
+│   │   ├── 2026-06-27 11:27
+│   │   │   ├── cat_model.joblib
+│   │   │   ├── features.joblib
+│   │   │   ├── lgbm_model.joblib
+│   │   │   ├── lgbm_model.txt
+│   │   │   └── metadata.json
+│   │   └── 2026-06-29 23:05
+│   │       ├── cat_model.joblib
+│   │       ├── features.joblib
+│   │       ├── lgbm_model.joblib
+│   │       ├── lgbm_model.txt
+│   │       └── metadata.json
+│   └── predictions
+│       ├── all_predictions_1d_2026-06-15.parquet
+│       ├── all_predictions_1d_2026-06-16.parquet
+│       ├── all_predictions_1d_2026-06-17.parquet
+│       ├── all_predictions_1d_2026-06-18.parquet
+│       ├── all_predictions_1d_2026-06-22.parquet
+│       ├── all_predictions_1d_2026-06-24.parquet
+│       ├── all_predictions_1d_2026-06-25.parquet
+│       ├── all_predictions_1d_2026-06-26.parquet
+│       ├── all_predictions_1d_2026-06-29.parquet
+│       ├── latest_all_predictions.parquet
+│       ├── latest_paper_signals.csv
+│       ├── paper_signals_1d_2026-06-15.csv
+│       ├── paper_signals_1d_2026-06-16.csv
+│       ├── paper_signals_1d_2026-06-17.csv
+│       ├── paper_signals_1d_2026-06-18.csv
+│       ├── paper_signals_1d_2026-06-22.csv
+│       ├── paper_signals_1d_2026-06-24.csv
+│       ├── paper_signals_1d_2026-06-25.csv
+│       ├── paper_signals_1d_2026-06-26.csv
+│       └── paper_signals_1d_2026-06-29.csv
+├── results
+│   ├── Market-Predictor.tar.gz
+│   ├── cat_optuna_1d.db
+│   ├── cat_optuna_1h.db
+│   ├── cat_params_1d.json
+│   ├── cat_params_1h.json
+│   ├── cat_top_results_1d.json
+│   ├── cat_top_results_1h.json
+│   ├── lgbm_optuna_1d.db
+│   ├── lgbm_optuna_1h.db
+│   ├── lgbm_params_1d.json
+│   ├── lgbm_params_1h.json
+│   ├── lgbm_top_results_1d.json
+│   ├── lgbm_top_results_1h.json
+│   ├── testing.txt
+│   └── training.log
+├── run.py
+├── scripts
+│   ├── config.py
+│   ├── data_management.py
+│   ├── indicators.py
+│   ├── predictor.py
+│   └── testing_things.py

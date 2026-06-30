@@ -1,0 +1,59 @@
+Loading raw data...
+
+
+Building universe dataframe...
+
+
+Preparing pooled features...
+Full training rows: 905,235
+Features: 66
+Latest labelled date: 2026-04-30
+Training LightGBM...
+Training CatBoost...
+Saving assets...
+Building latest prediction universe...
+
+
+Latest rows: 225
+Consensus rows: 33
+Buy signals: 5
+Top ensemble rows:
+ticker     pred  pred_signal  ensemble_agreement  pred_cat  pred_lgbm  cat_rank_pct  lgbm_rank_pct
+  EOSE 1.000000            1                   1  0.337411   0.518598      1.000000       1.000000
+  AMAT 0.990222            1                   1  0.222574   0.261918      0.995556       0.982222
+   WDC 0.982222            1                   1  0.219577   0.201066      0.991111       0.968889
+  FLNC 0.981333            1                   1  0.188598   0.241403      0.986667       0.973333
+  JOBY 0.976000            1                   1  0.155787   0.274771      0.968889       0.986667
+  LRCX 0.968000            0                   1  0.177190   0.161291      0.982222       0.946667
+   UEC 0.964444            0                   1  0.143760   0.192126      0.964444       0.964444
+  RCAT 0.956444            0                   1  0.131567   0.241531      0.942222       0.977778
+  LUMN 0.956444            0                   1  0.116301   0.285496      0.933333       0.991111
+   SMR 0.952889            0                   1  0.163301   0.118837      0.977778       0.915556
+  SOUN 0.952000            0                   1  0.132371   0.185945      0.946667       0.960000
+  QUBT 0.944889            0                   1  0.128293   0.170803      0.937778       0.955556
+   AMD 0.936000            0                   1  0.156668   0.079342      0.973333       0.880000
+  OSCR 0.934222            0                   1  0.100039   0.158260      0.928889       0.942222
+   EXK 0.933333            0                   1  0.133093   0.107771      0.951111       0.906667
+    ON 0.928889            0                   1  0.068342   0.320013      0.884444       0.995556
+  UUUU 0.927111            0                   1  0.133761   0.081054      0.955556       0.884444
+    QS 0.924444            0                   1  0.098754   0.130599      0.924444       0.924444
+  LUNR 0.920889            0                   1  0.134193   0.061862      0.960000       0.862222
+  RIOT 0.912000            0                   1  0.079523   0.121444      0.906667       0.920000
+Saved paper holdings to: /home/god/Projects/market_predictor/model/paper/paper_holdings_1d.csv
+Saved paper orders to: /home/god/Projects/market_predictor/model/paper/paper_orders_1d_2026-06-29.csv
+Paper orders:
+      date ticker        action         reason     pred  target_weight
+2026-06-29   EOSE BUY_NEXT_OPEN new_buy_signal 1.000000       0.033333
+2026-06-29   AMAT BUY_NEXT_OPEN new_buy_signal 0.990222       0.033333
+2026-06-29    WDC BUY_NEXT_OPEN new_buy_signal 0.982222       0.033333
+2026-06-29   FLNC BUY_NEXT_OPEN new_buy_signal 0.981333       0.033333
+2026-06-29   JOBY BUY_NEXT_OPEN new_buy_signal 0.976000       0.033333
+Saved all predictions to: /home/god/Projects/market_predictor/model/predictions/all_predictions_1d_2026-06-29.parquet
+Saved paper signals to: /home/god/Projects/market_predictor/model/predictions/paper_signals_1d_2026-06-29.csv
+Paper trade picks:
+signal_date ticker  paper_action  target_weight     pred  pred_cat  pred_lgbm  ensemble_score  cat_rank_pct  lgbm_rank_pct
+ 2026-06-29   EOSE BUY_NEXT_OPEN       0.033333 1.000000  0.337411   0.518598        1.000000      1.000000       1.000000
+ 2026-06-29   AMAT BUY_NEXT_OPEN       0.033333 0.990222  0.222574   0.261918        0.990222      0.995556       0.982222
+ 2026-06-29    WDC BUY_NEXT_OPEN       0.033333 0.982222  0.219577   0.201066        0.982222      0.991111       0.968889
+ 2026-06-29   FLNC BUY_NEXT_OPEN       0.033333 0.981333  0.188598   0.241403        0.981333      0.986667       0.973333
+ 2026-06-29   JOBY BUY_NEXT_OPEN       0.033333 0.976000  0.155787   0.274771        0.976000      0.968889       0.986667

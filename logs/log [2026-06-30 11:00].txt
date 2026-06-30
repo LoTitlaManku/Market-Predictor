@@ -1,0 +1,32 @@
+Loading raw data...
+
+
+Building universe dataframe...
+
+
+Preparing pooled features...
+Full training rows: 904,788
+Features: 66
+Latest labelled date: 2026-04-30
+Training LightGBM...
+Training CatBoost...
+Saving assets...
+Building latest prediction universe...
+
+
+Latest rows: 1
+Consensus rows: 1
+Buy signals: 0
+Top ensemble rows:
+ticker  pred  pred_signal  ensemble_agreement  pred_cat  pred_lgbm  cat_rank_pct  lgbm_rank_pct
+  SHEL   1.0            0                   1 -0.000022   0.021375           1.0            1.0
+Saved paper holdings to: /home/god/Projects/market_predictor/model/paper/paper_holdings_1d.csv
+Saved paper orders to: /home/god/Projects/market_predictor/model/paper/paper_orders_1d_2026-06-29.csv
+Paper orders:
+No paper orders.
+Saved all predictions to: /home/god/Projects/market_predictor/model/predictions/all_predictions_1d_2026-06-29.parquet
+Saved paper signals to: /home/god/Projects/market_predictor/model/predictions/paper_signals_1d_2026-06-29.csv
+Paper trade picks:
+Empty DataFrame
+Columns: [signal_date, ticker, paper_action, target_weight, pred, pred_cat, pred_lgbm, ensemble_score, cat_rank_pct, lgbm_rank_pct]
+Index: []

@@ -965,7 +965,7 @@ class Predictor:
 
         picks["signal_date"] = latest_date
         picks["paper_action"] = "BUY_NEXT_OPEN"
-        picks["target_weight"] = 1.0 / len(picks) if len(picks) else 0.0
+        picks["target_weight"] = 1.0 / self.config.max_top_tickers if len(picks) else 0.0
 
         cols = [
             "signal_date", "ticker", "paper_action", "target_weight",
@@ -983,13 +983,155 @@ class Predictor:
         picks.to_csv(pred_dir / f"paper_signals_{self.interval}_{date_str}.csv", index=False)
         picks.to_csv(pred_dir / "latest_paper_signals.csv", index=False)
 
-        log(f"Saved all predictions to: {pred_dir / f'all_predictions_{self.interval}_{date_str}.parquet'}")
-        log(f"Saved paper signals to: {pred_dir / f'paper_signals_{self.interval}_{date_str}.csv'}")
-
-        log("Paper trade picks:")
-        log(picks.to_string(index=False))
-
+        self.update_paper_ledger(latest, picks)
         return picks
+
+    def update_paper_ledger(self, latest: pd.DataFrame, picks: pd.DataFrame) -> None:
+        paper_dir = Path(MODEL_DIR) / "paper"
+        paper_dir.mkdir(parents=True, exist_ok=True)
+
+        latest_date = pd.Timestamp(latest["Date"].max())
+        date_str = latest_date.strftime("%Y-%m-%d")
+
+        holdings_path = paper_dir / f"paper_holdings_{self.interval}.csv"
+        orders_path = paper_dir / f"paper_orders_{self.interval}_{date_str}.csv"
+        latest_orders_path = paper_dir / f"latest_paper_orders_{self.interval}.csv"
+
+        holding_cols = [
+            "ticker", "side", "entry_date", "age",
+            "entry_score", "last_score", "last_pred",
+            "last_pred_cat", "last_pred_lgbm", "last_seen_date",
+        ]
+
+        if holdings_path.exists():
+            holdings = pd.read_csv(holdings_path)
+        else:
+            holdings = pd.DataFrame(columns=holding_cols)
+
+        for col in holding_cols:
+            if col not in holdings.columns:
+                holdings[col] = np.nan
+
+        holdings["ticker"] = holdings["ticker"].astype(str)
+        holdings["side"] = pd.to_numeric(holdings["side"], errors="coerce").fillna(1).astype(int)
+        holdings["age"] = pd.to_numeric(holdings["age"], errors="coerce").fillna(0).astype(int)
+
+        # Recalculate exit signals with shorts allowed so existing longs can receive opposite signals.
+        exit_latest = self.datamanager.add_signals(latest.copy(), allow_short=True)
+        latest_by_ticker = exit_latest.set_index("ticker", drop=False)
+
+        orders = []
+        keep_rows = []
+
+        for _, holding in holdings.iterrows():
+            ticker = holding["ticker"]
+
+            if ticker not in latest_by_ticker.index:
+                orders.append({
+                    "date": latest_date,
+                    "ticker": ticker,
+                    "action": "SELL_NEXT_OPEN",
+                    "reason": "missing_from_latest_universe",
+                })
+                continue
+
+            row = latest_by_ticker.loc[ticker]
+            side = int(holding["side"])
+            age = int(holding["age"]) + 1
+
+            opposite_signal = int(row["pred_signal"]) == -side
+            weak_long = side == 1 and float(row["pred"]) <= self.config.exit_pred_threshold
+            weak_short = side == -1 and float(row["pred"]) >= -self.config.exit_pred_threshold
+            too_old = age >= self.config.horizon
+
+            if opposite_signal or weak_long or weak_short or too_old:
+                reasons = []
+                if opposite_signal: reasons.append("opposite_signal")
+                if weak_long: reasons.append("weak_long")
+                if weak_short: reasons.append("weak_short")
+                if too_old: reasons.append("too_old")
+
+                orders.append({
+                    "date": latest_date,
+                    "ticker": ticker,
+                    "action": "SELL_NEXT_OPEN" if side == 1 else "COVER_NEXT_OPEN",
+                    "reason": ",".join(reasons),
+                    "pred": float(row["pred"]),
+                    "pred_signal": int(row["pred_signal"]),
+                    "age": age,
+                })
+                continue
+
+            holding = holding.copy()
+            holding["age"] = age
+            holding["last_score"] = float(row["ensemble_score"])
+            holding["last_pred"] = float(row["pred"])
+            holding["last_pred_cat"] = float(row["pred_cat"])
+            holding["last_pred_lgbm"] = float(row["pred_lgbm"])
+            holding["last_seen_date"] = latest_date
+
+            keep_rows.append(holding.to_dict())
+
+            orders.append({
+                "date": latest_date,
+                "ticker": ticker,
+                "action": "HOLD",
+                "reason": "still_valid",
+                "pred": float(row["pred"]),
+                "pred_signal": int(row["pred_signal"]),
+                "age": age,
+            })
+
+        new_holdings = pd.DataFrame(keep_rows, columns=holding_cols)
+        held_tickers = set(new_holdings["ticker"]) if not new_holdings.empty else set()
+
+        # Add only genuinely new buy candidates. Repeated buy signals become HOLD, not more buying.
+        for _, row in picks.iterrows():
+            ticker = str(row["ticker"])
+
+            if ticker in held_tickers:
+                continue
+
+            if len(new_holdings) >= self.config.max_top_tickers:
+                orders.append({
+                    "date": latest_date,
+                    "ticker": ticker,
+                    "action": "SKIP_BUY_FULL",
+                    "reason": "portfolio_full",
+                    "pred": float(row["pred"]),
+                })
+                continue
+
+            new_row = {
+                "ticker": ticker,
+                "side": 1,
+                "entry_date": latest_date,
+                "age": 0,
+                "entry_score": float(row["ensemble_score"]),
+                "last_score": float(row["ensemble_score"]),
+                "last_pred": float(row["pred"]),
+                "last_pred_cat": float(row["pred_cat"]),
+                "last_pred_lgbm": float(row["pred_lgbm"]),
+                "last_seen_date": latest_date,
+            }
+
+            new_holdings = pd.concat([new_holdings, pd.DataFrame([new_row])], ignore_index=True)
+            held_tickers.add(ticker)
+
+            orders.append({
+                "date": latest_date,
+                "ticker": ticker,
+                "action": "BUY_NEXT_OPEN",
+                "reason": "new_buy_signal",
+                "pred": float(row["pred"]),
+                "target_weight": 1.0 / self.config.max_top_tickers,
+            })
+
+        new_holdings.to_csv(holdings_path, index=False)
+
+        orders_df = pd.DataFrame(orders)
+        orders_df.to_csv(orders_path, index=False)
+        orders_df.to_csv(latest_orders_path, index=False)
 
     def run_pipeline(self, load_model=None) -> bool:
         if self.interval == "1d":
@@ -1003,6 +1145,7 @@ class Predictor:
         data_dict = self.datamanager.load_raw_data(self.interval)
 
         if load_model is not None:
+            log("Loading models...")
             models = self.load_models(load_model)
 
         else:

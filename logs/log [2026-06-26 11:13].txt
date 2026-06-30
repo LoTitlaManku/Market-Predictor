@@ -1,0 +1,25 @@
+Loading raw data...
+
+
+Building universe dataframe...
+
+
+Preparing pooled features...
+Full training rows: 904,785
+Features: 66
+Latest labelled date: 2026-04-28
+Training LightGBM...
+Training CatBoost...
+Saving assets...
+Building latest prediction universe...
+
+
+Saved all predictions to: /home/god/Projects/market_predictor/model/predictions/all_predictions_1d_2026-06-25.parquet
+Saved paper signals to: /home/god/Projects/market_predictor/model/predictions/paper_signals_1d_2026-06-25.csv
+Paper trade picks:
+signal_date ticker  paper_action  target_weight     pred  pred_cat  pred_lgbm  ensemble_score  cat_rank_pct  lgbm_rank_pct
+ 2026-06-25   EOSE BUY_NEXT_OPEN            0.2 1.000000  0.375964   0.488128        1.000000      1.000000       1.000000
+ 2026-06-25   INTC BUY_NEXT_OPEN            0.2 0.978761  0.259933   0.280352        0.978761      0.991150       0.960177
+ 2026-06-25   LUNR BUY_NEXT_OPEN            0.2 0.977876  0.235347   0.301600        0.977876      0.977876       0.977876
+ 2026-06-25    SMR BUY_NEXT_OPEN            0.2 0.967257  0.325848   0.221533        0.967257      0.995575       0.924779
+ 2026-06-25   QUBT BUY_NEXT_OPEN            0.2 0.964602  0.234346   0.276463        0.964602      0.973451       0.951327

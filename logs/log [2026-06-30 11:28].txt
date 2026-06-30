@@ -1,0 +1,36 @@
+Loading raw data...
+
+
+Building latest prediction universe...
+
+
+Saved paper holdings to: /home/god/Projects/market_predictor/model/paper/paper_holdings_1d.csv
+Saved paper orders to: /home/god/Projects/market_predictor/model/paper/paper_orders_1d_2026-06-29.csv
+Paper orders:
+      date ticker         action                       reason     pred  pred_signal  age  target_weight
+2026-06-29   EOSE           HOLD                  still_valid 1.000000          1.0 15.0            NaN
+2026-06-29   RCAT           HOLD                  still_valid 0.956444          0.0 15.0            NaN
+2026-06-29   ACHR SELL_NEXT_OPEN missing_from_latest_universe      NaN          NaN  NaN            NaN
+2026-06-29     QS           HOLD                  still_valid 0.924444          0.0 15.0            NaN
+2026-06-29   UUUU           HOLD                  still_valid 0.927111          0.0 15.0            NaN
+2026-06-29   LUMN           HOLD                  still_valid 0.956444          0.0 14.0            NaN
+2026-06-29    AMD           HOLD                  still_valid 0.936000          0.0 14.0            NaN
+2026-06-29   AMAT           HOLD                  still_valid 0.990222          1.0 14.0            NaN
+2026-06-29    WDC           HOLD                  still_valid 0.982222          1.0 13.0            NaN
+2026-06-29   SOUN           HOLD                  still_valid 0.952000          0.0 12.0            NaN
+2026-06-29   OSCR           HOLD                  still_valid 0.934222          0.0  6.0            NaN
+2026-06-29   LUNR           HOLD                  still_valid 0.920889          0.0  6.0            NaN
+2026-06-29    SMR           HOLD                  still_valid 0.952889          0.0  6.0            NaN
+2026-06-29   QUBT           HOLD                  still_valid 0.944889          0.0  6.0            NaN
+2026-06-29   INTC SELL_NEXT_OPEN                    weak_long 0.000000          0.0  5.0            NaN
+2026-06-29   FLNC  BUY_NEXT_OPEN               new_buy_signal 0.981333          NaN  NaN       0.033333
+2026-06-29   JOBY  BUY_NEXT_OPEN               new_buy_signal 0.976000          NaN  NaN       0.033333
+Saved all predictions to: /home/god/Projects/market_predictor/model/predictions/all_predictions_1d_2026-06-29.parquet
+Saved paper signals to: /home/god/Projects/market_predictor/model/predictions/paper_signals_1d_2026-06-29.csv
+Paper trade picks:
+signal_date ticker  paper_action  target_weight     pred  pred_cat  pred_lgbm  ensemble_score  cat_rank_pct  lgbm_rank_pct
+ 2026-06-29   EOSE BUY_NEXT_OPEN       0.033333 1.000000  0.337411   0.518598        1.000000      1.000000       1.000000
+ 2026-06-29   AMAT BUY_NEXT_OPEN       0.033333 0.990222  0.222574   0.261918        0.990222      0.995556       0.982222
+ 2026-06-29    WDC BUY_NEXT_OPEN       0.033333 0.982222  0.219577   0.201066        0.982222      0.991111       0.968889
+ 2026-06-29   FLNC BUY_NEXT_OPEN       0.033333 0.981333  0.188598   0.241403        0.981333      0.986667       0.973333
+ 2026-06-29   JOBY BUY_NEXT_OPEN       0.033333 0.976000  0.155787   0.274771        0.976000      0.968889       0.986667
