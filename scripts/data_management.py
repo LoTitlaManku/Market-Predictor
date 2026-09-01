@@ -3,6 +3,7 @@
 import os
 import json
 import re
+from functools import lru_cache
 
 # External library imports
 import pandas as pd
@@ -23,6 +24,70 @@ NYSE_CAL = mcal.get_calendar('NYSE')
 def utc_now_naive() -> pd.Timestamp:
     return pd.Timestamp.now(tz="UTC").tz_localize(None)
 
+
+def _normalise_comparative_frame(df: pd.DataFrame) -> pd.DataFrame:
+    """Return a clean, naive-UTC market-comparison frame.
+
+    Some legacy CSV files contain an old integer index which pandas interprets as
+    nanoseconds after 1970.  Those rows are invalid; the parquet history remains
+    authoritative and valid newer CSV rows are overlaid on top of it.
+    """
+    if df is None or df.empty:
+        return pd.DataFrame()
+
+    df = df.copy()
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = df.columns.get_level_values(0)
+
+    index = pd.to_datetime(df.index, utc=True, errors="coerce", format="mixed").tz_localize(None)
+    valid = index.notna() & (index.year > 1970)
+    df = df.loc[valid].copy()
+    df.index = index[valid]
+    df.index.name = "Date"
+    df = df.loc[:, ~df.columns.duplicated()]
+    df = df[~df.index.duplicated(keep="last")].sort_index()
+
+    if "Adj Close" not in df.columns and "Close" in df.columns:
+        df["Adj Close"] = df["Close"]
+    if "Adj Close" in df.columns:
+        df = df.dropna(subset=["Adj Close"])
+    return df
+
+
+@lru_cache(maxsize=16)
+def _load_comparative_data_cached(key: str, interval: str) -> pd.DataFrame:
+    """Combine the clean parquet history with any newer CSV observations."""
+    name = key.replace("^", "")
+    frames: list[pd.DataFrame] = []
+
+    parquet_path = os.path.join(DATA_DIR, f"{name}_{interval}.parquet")
+    if os.path.exists(parquet_path):
+        frames.append(_normalise_comparative_frame(pd.read_parquet(parquet_path)))
+
+    csv_path = os.path.join(DATA_DIR, f"{name}_{interval}.csv")
+    if os.path.exists(csv_path):
+        csv_df = pd.read_csv(csv_path, index_col=0, parse_dates=True)
+        frames.append(_normalise_comparative_frame(csv_df))
+
+    frames = [frame for frame in frames if not frame.empty]
+    if not frames:
+        raise FileNotFoundError(f"No comparative data found for {name}_{interval}")
+
+    data = pd.concat(frames, axis=0)
+    data = data[~data.index.duplicated(keep="last")].sort_index()
+    if "Adj Close" not in data.columns:
+        raise ValueError(f"Comparative data for {name}_{interval} has no Adj Close column")
+    return data
+
+
+def load_comparative_data(key: str, interval: str) -> pd.DataFrame:
+    """Load a defensive copy of a cached comparative market series."""
+    return _load_comparative_data_cached(key, interval).copy()
+
+
+def clear_comparative_data_cache() -> None:
+    _load_comparative_data_cached.cache_clear()
+
 # Helper function to load data for a stock
 def load_data(ticker: str, interval: str = "1d") -> pd.DataFrame | None:
     cache_file = os.path.join(CACHE_DIR, f"{ticker}_{interval}.csv")
@@ -32,6 +97,7 @@ def load_data(ticker: str, interval: str = "1d") -> pd.DataFrame | None:
         df = pd.read_csv(cache_file, index_col=0, parse_dates=True)
         df.index.name = "Date"
         df.index = pd.to_datetime(df.index, utc=True).tz_localize(None)
+        df = df[~df.index.duplicated(keep="last")].sort_index()
         return df
 
     # Download the appropriate data from yahoo finance elsewise
@@ -147,17 +213,12 @@ class UpdateWorker:
     @staticmethod
     def update_comparatives():
         for comparative in ["^VIX", "^VVIX", "^TYX", "SPY"]:
-            # Load existing cached stock data from file
-            cache_file = os.path.join(DATA_DIR, f"{comparative.replace("^", "")}_1d.csv")
-
-            df = pd.read_csv(cache_file, index_col=0, parse_dates=True)
-            df.index = pd.to_datetime(df.index, utc=True, errors="coerce").tz_localize(None)
-            df = df[df.index.notna()]
-            df.index.name = "Date"
-
-            df = df.loc[:, ~df.columns.duplicated()]
-            df = df[~df.index.duplicated(keep="last")]
-            df = df.sort_index()
+            # Start from the clean parquet history and overlay valid newer CSV rows.
+            # The predictor consumes this same merged representation.
+            name = comparative.replace("^", "")
+            cache_file = os.path.join(DATA_DIR, f"{name}_1d.csv")
+            parquet_file = os.path.join(DATA_DIR, f"{name}_1d.parquet")
+            df = load_comparative_data(comparative, "1d")
 
             # Fetch for the period that has passed
             start_date = df.index.max() - pd.Timedelta(days=5)
@@ -180,7 +241,11 @@ class UpdateWorker:
             updated_df = pd.concat([df, new_data])
             updated_df = updated_df[~updated_df.index.duplicated(keep='last')]
             updated_df = updated_df.loc[:, ~updated_df.columns.duplicated()]
+            updated_df = updated_df.sort_index()
             updated_df.to_csv(cache_file)
+            updated_df.to_parquet(parquet_file)
+
+        clear_comparative_data_cache()
 
     @staticmethod
     def sentiment_update():

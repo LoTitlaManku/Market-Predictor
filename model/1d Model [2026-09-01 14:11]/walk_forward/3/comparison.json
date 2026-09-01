@@ -1,0 +1,36 @@
+{
+    "window": {
+        "cutoff_date": "2026-05-31",
+        "start_date": "2026-06-01",
+        "end_date": "2026-08-27",
+        "retraining": "single_fit_at_cutoff"
+    },
+    "original_reported_simulation": {
+        "final_equity": 649.5133064429807,
+        "total_return": -0.35048669355701934,
+        "max_drawdown": -0.43022712310380096,
+        "note": "Incorrectly averaged active holdings to 100% exposure and used 20 slots."
+    },
+    "original_signals_replayed_at_paper_sizing": {
+        "final_equity": 865.7997208682015,
+        "total_return": -0.13420027913179855,
+        "max_drawdown": -0.17942378168826922,
+        "average_gross_exposure": 0.36451612903225805,
+        "note": "Original saved position returns replayed at fixed 1/30 slot weights."
+    },
+    "updated_pipeline": {
+        "final_equity": 997.1728049846753,
+        "total_return": -0.0028271950153246905,
+        "max_drawdown": -0.027757091031332504,
+        "average_gross_exposure": 0.341105298179217,
+        "average_regime_exposure": 0.9516129032258065
+    },
+    "entry_risk": {
+        "original_median_annualised_volatility": 0.9127796401683865,
+        "updated_median_annualised_volatility": 0.3839772926930989,
+        "original_median_absolute_beta": 3.0,
+        "updated_median_absolute_beta": 0.7162511827290581,
+        "updated_max_absolute_beta": 1.9702992827722337
+    },
+    "spy_buy_and_hold_return": 0.01917701733077415
+}

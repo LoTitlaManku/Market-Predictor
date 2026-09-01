@@ -1,0 +1,116 @@
+==================================================
+ANCHORED OUT-OF-SAMPLE BACKTEST (1d): cutoff = 6 months (single fit)
+==================================================
+Loading all tickers...
+
+
+Latest available date: 2026-08-31
+Cutoff date: 2026-02-28
+Building training universe up to cutoff...
+
+
+Building full universe for walk-forward predictions...
+
+
+Walk-forward cutoff date: 2026-02-28
+Train rows: 1,610,292
+Walk-forward rows: 96,043
+Features: 92
+Training CAT up to cutoff...
+Training LGBM up to cutoff...
+
+
+Saved walk-forward results to: /home/god/Projects/market_predictor/model/1d Model [2026-09-01 14:55]/walk_forward/6
+Walk-forward summary:
+{
+    "interval": "1d",
+    "model_type": "ENSEMBLE",
+    "retraining": "single_fit_at_cutoff",
+    "target_column": "target_risk_adjusted_return",
+    "months_back": 6,
+    "cutoff_date": "2026-02-28",
+    "start_date": "2026-03-02",
+    "end_date": "2026-08-27",
+    "initial_capital": 1000.0,
+    "final_equity": 1109.2750097519192,
+    "profit_loss": 109.27500975191924,
+    "total_return": 0.10927500975191928,
+    "cagr_like": 0.2325345039705875,
+    "sharpe_like": 2.2739660514403703,
+    "max_drawdown": -0.06286946590491538,
+    "win_rate": 0.568,
+    "mean_daily_return": 0.0008473368046500547,
+    "median_daily_return": 0.0006732253694709509,
+    "avg_holdings": 22.888,
+    "avg_gross_exposure": 0.5627515479218729,
+    "avg_regime_exposure": 0.832,
+    "avg_turnover": 1.92,
+    "trade_count": 240,
+    "attribution_concentration": {
+        "total_positive_pnl": 195.25216469514484,
+        "top_1_pnl": 15.826165020233741,
+        "top_3_pnl": 34.769412779195186,
+        "top_5_pnl": 50.97345263117141,
+        "top_1_share_of_positive_pnl": 0.08105500415293104,
+        "top_3_share_of_positive_pnl": 0.17807440359743046,
+        "top_5_share_of_positive_pnl": 0.26106472474073894
+    }
+}
+==================================================
+ANCHORED OUT-OF-SAMPLE BACKTEST (1d): cutoff = 12 months (single fit)
+==================================================
+Loading all tickers...
+
+
+Latest available date: 2026-08-31
+Cutoff date: 2025-08-31
+Building training universe up to cutoff...
+
+
+Building full universe for walk-forward predictions...
+
+
+Walk-forward cutoff date: 2025-08-31
+Train rows: 1,579,476
+Walk-forward rows: 190,489
+Features: 92
+Training CAT up to cutoff...
+Training LGBM up to cutoff...
+
+
+Saved walk-forward results to: /home/god/Projects/market_predictor/model/1d Model [2026-09-01 14:55]/walk_forward/12
+Walk-forward summary:
+{
+    "interval": "1d",
+    "model_type": "ENSEMBLE",
+    "retraining": "single_fit_at_cutoff",
+    "target_column": "target_risk_adjusted_return",
+    "months_back": 12,
+    "cutoff_date": "2025-08-31",
+    "start_date": "2025-09-02",
+    "end_date": "2026-08-27",
+    "initial_capital": 1000.0,
+    "final_equity": 1252.3941150052256,
+    "profit_loss": 252.39411500522556,
+    "total_return": 0.25239411500522557,
+    "cagr_like": 0.2557946277571974,
+    "sharpe_like": 2.8575173800241145,
+    "max_drawdown": -0.02854059677840859,
+    "win_rate": 0.5301204819277109,
+    "mean_daily_return": 0.0009171344866499515,
+    "median_daily_return": 0.00024032781692758933,
+    "avg_holdings": 20.40963855421687,
+    "avg_gross_exposure": 0.5476799163576084,
+    "avg_regime_exposure": 0.8815261044176707,
+    "avg_turnover": 2.4738955823293174,
+    "trade_count": 616,
+    "attribution_concentration": {
+        "total_positive_pnl": 370.2683922552902,
+        "top_1_pnl": 17.204626682678708,
+        "top_3_pnl": 47.33800950776815,
+        "top_5_pnl": 68.62876207759655,
+        "top_1_share_of_positive_pnl": 0.04646528583735166,
+        "top_3_share_of_positive_pnl": 0.1278478274082057,
+        "top_5_share_of_positive_pnl": 0.1853486916870799
+    }
+}

@@ -303,6 +303,55 @@ def repair_all_cache_csvs():
         df = df.drop(columns=['not_null_count'])
         df.to_csv(file_path)
 
+
+########################################################################################################################
+
+def plot_performance_metrics(csv_path: str):
+    import pandas as pd
+    import matplotlib.pyplot as plt
+
+    df = pd.read_csv(csv_path)
+    df['Date'] = pd.to_datetime(df['Date'])
+    df = df.sort_values('Date')
+
+    fig, axes = plt.subplots(3, 1, figsize=(12, 10), sharex=True)
+
+    # 1. Equity Curve
+    axes[0].plot(df['Date'], df['equity'], label='Equity', color='tab:blue', linewidth=1.5)
+    axes[0].set_title('Portfolio Equity Curve')
+    axes[0].set_ylabel('Equity (£)')
+    axes[0].grid(True, alpha=0.3)
+    axes[0].legend(loc='upper left')
+
+    # 2. Returns
+    if 'daily_return' in df.columns:
+        axes[1].plot(df['Date'], df['daily_return'], label='Daily Return', color='tab:green', alpha=0.7, linewidth=1)
+    if 'gross_return' in df.columns:
+        axes[1].plot(df['Date'], df['gross_return'], label='Gross Return', color='tab:orange', alpha=0.5, linewidth=1)
+    axes[1].set_title('Returns')
+    axes[1].set_ylabel('Return')
+    axes[1].grid(True, alpha=0.3)
+    axes[1].legend(loc='upper left')
+
+    # 3. Turnover & Holdings
+    ax3 = axes[2]
+    if 'turnover' in df.columns:
+        ax3.plot(df['Date'], df['turnover'], label='Turnover', color='tab:purple', alpha=0.8, linewidth=1)
+        ax3.set_ylabel('Turnover', color='tab:purple')
+
+    if 'holdings' in df.columns:
+        ax3_twin = ax3.twinx()
+        ax3_twin.plot(df['Date'], df['holdings'], label='Holdings Count', color='tab:red', alpha=0.6, linewidth=1)
+        ax3_twin.set_ylabel('Holdings Count', color='tab:red')
+        ax3_twin.grid(False)
+
+    axes[2].set_title('Turnover and Holdings')
+    axes[2].set_xlabel('Date')
+    axes[2].grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    plt.show()
+
 ########################################################################################################################
 
 if __name__ in "__main__":
@@ -322,14 +371,15 @@ if __name__ in "__main__":
     # )
     # find_latest()
 
-    from predictor import Predictor
-    print("Training...")
-    mng = Predictor("1d")
-    mng.run_pipeline("latest")
+    # from predictor import Predictor
+    # print("Training...")
+    # mng = Predictor("1d")
+    # mng.run_pipeline("latest")
 
     # from folder_trees import generate_tree
     # generate_tree("/home/god/Projects/market_predictor", ignore_paths=[".bin", ".venv", "cache_files", "imgs"])
 
+    plot_performance_metrics("/home/god/Projects/market_predictor/model/1d Model [2026-09-01 14:55]/walk_forward/12/daily_equity.csv")
 
     print(time.perf_counter() - start)
     pass

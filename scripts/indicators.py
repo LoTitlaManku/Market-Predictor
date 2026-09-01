@@ -7,6 +7,7 @@ import talib
 from pykalman import KalmanFilter
 
 from scripts.config import DATA_DIR
+from scripts.data_management import load_comparative_data
 
 @pd.api.extensions.register_dataframe_accessor("ind")
 class TechnicalAnalysisAccessor:
@@ -14,8 +15,11 @@ class TechnicalAnalysisAccessor:
         self._obj = pandas_obj
 
     def add_indicators(self, ticker: str, interval: str, add_targets: bool = True) -> pd.DataFrame:
-        df = self._obj
-        df.index = df.index.astype('datetime64[ms]')
+        df = self._obj.copy()
+        df.index = pd.to_datetime(df.index, utc=True, errors="coerce").tz_localize(None)
+        df = df[df.index.notna()]
+        df = df[~df.index.duplicated(keep="last")].sort_index()
+        df.index = df.index.astype('datetime64[ns]')
 
         # Add all indicators
         df = self._add_sentiment(df, ticker)
@@ -115,10 +119,15 @@ class TechnicalAnalysisAccessor:
         df['MACD_Hist'] = macdhist
         df['ADX'] = talib.ADX(df['Adj High'], df['Adj Low'], df['Adj Close'], timeperiod=14)
         df['ATR'] = talib.ATR(df["Adj High"], df['Adj Low'], df['Adj Close'], timeperiod=14)
+        df['ATR_Pct'] = df['ATR'] / df['Adj Close']
         df['MA_200'] = talib.SMA(df['Adj Close'], timeperiod=200)
         df['PDMA_200'] = (df['Adj Close'] / df['MA_200']) - 1
 
         df['OBV'] = talib.OBV(df['Adj Close'], df['Volume'])
+        obv_mean = df['OBV'].rolling(63).mean()
+        obv_std = df['OBV'].rolling(63).std()
+        df['OBV_Z_63'] = (df['OBV'] - obv_mean) / (obv_std + 1e-9)
+        df['MACD_Hist_Pct'] = df['MACD_Hist'] / df['Adj Close']
         upper, mid, lower = talib.BBANDS(df['Adj Close'], timeperiod=20)
         df['BBP'] = (df['Adj Close'] - lower) / (upper - lower)
         df['BBP'] = df['BBP'].replace([np.inf, -np.inf], 0.5)
@@ -131,10 +140,11 @@ class TechnicalAnalysisAccessor:
         df['lower_shadow_pct'] = (df[['Adj Open', 'Adj Close']].min(axis=1) - df['Adj Low']) / df['Adj Close']
 
         # Garman-Klass Volatility
-        df['GK_vol'] = np.sqrt(
+        gk_variance = (
             0.5 * np.log(df['Adj High'] / df['Adj Low']) ** 2
             - (2 * np.log(2) - 1) * np.log(df['Adj Close'] / df['Adj Open']) ** 2
-        ).rolling(20).mean()
+        ).clip(lower=0.0)
+        df['GK_vol'] = np.sqrt(gk_variance).rolling(20).mean()
 
         # Overnight Gap
         df['overnight_gap'] = (df['Adj Open'] - df['Adj Close'].shift(1)) / df['Adj Close'].shift(1)
@@ -171,9 +181,15 @@ class TechnicalAnalysisAccessor:
 
         # Other indicators
         df['vol_ratio'] = df['return'].rolling(5).std() / df['return'].rolling(50).std()
-        df['hour'] = df.index.hour
-        df['day_of_week'] = df.index.dayofweek
-        df['month'] = df.index.month
+        hour = df.index.hour
+        day_of_week = df.index.dayofweek
+        month = df.index.month
+        df['hour_sin'] = np.sin(2 * np.pi * hour / 24.0)
+        df['hour_cos'] = np.cos(2 * np.pi * hour / 24.0)
+        df['day_of_week_sin'] = np.sin(2 * np.pi * day_of_week / 5.0)
+        df['day_of_week_cos'] = np.cos(2 * np.pi * day_of_week / 5.0)
+        df['month_sin'] = np.sin(2 * np.pi * (month - 1) / 12.0)
+        df['month_cos'] = np.cos(2 * np.pi * (month - 1) / 12.0)
 
         return df
 
@@ -330,39 +346,68 @@ class TechnicalAnalysisAccessor:
     @staticmethod
     def _add_vix(df: pd.DataFrame, interval: str):
         # Market fear context
-        vix_data = pd.read_parquet(os.path.join(DATA_DIR, f'VIX_{interval}.parquet'))
+        vix_data = load_comparative_data("VIX", interval)
         vix_data.index.name = "Date"
         vix_data.index = pd.to_datetime(vix_data.index, utc=True).tz_localize(None)
-        vix_data.index = vix_data.index.astype('datetime64[ms]')
-        vix_data = vix_data[~vix_data.index.duplicated(keep='first')]
+        vix_data.index = vix_data.index.astype('datetime64[ns]')
+        vix_data = vix_data[~vix_data.index.duplicated(keep='last')].sort_index()
+
+        periods_per_day = 7 if interval == "1h" else 1
+        vix_close = vix_data['Adj Close'].astype(float)
+        vix_features = pd.DataFrame(index=vix_data.index)
+        vix_features['VIX_Level'] = vix_close
+        vix_features['VIX_Change'] = vix_close.pct_change()
+        vix_features['VIX_Change_5'] = np.log(
+            vix_close / vix_close.shift(5 * periods_per_day)
+        )
+        vix_features['VIX_Relative'] = vix_close / vix_close.rolling(60 * periods_per_day).mean()
+        percentile_window = 252 * periods_per_day
+        min_periods = 126 * periods_per_day
+        vix_features['VIX_Percentile_252'] = (
+            vix_close.rolling(percentile_window, min_periods=min_periods).rank(pct=True)
+        )
 
         df = pd.merge_asof(
             df,
-            vix_data[['Adj Close']].rename(columns={'Adj Close': 'VIX_Level'}),
+            vix_features,
             left_index=True,
             right_index=True,
             direction='backward'
         )
-
-        # Fear Momentum
-        df['VIX_Change'] = df['VIX_Level'].pct_change().fillna(0)
-        # Relative Volatility
-        vix_ma = df['VIX_Level'].rolling(window=60).mean()
-        df['VIX_Relative'] = (df['VIX_Level'] / vix_ma).fillna(1.0)
 
         return df
 
     @staticmethod
     def _add_spy(df: pd.DataFrame, interval: str):
         # Market context
-        spy_data = pd.read_parquet(os.path.join(DATA_DIR, f'SPY_{interval}.parquet'))
+        spy_data = load_comparative_data("SPY", interval)
         spy_data.index.name = "Date"
         spy_data.index = pd.to_datetime(spy_data.index, utc=True).tz_localize(None)
-        spy_data = spy_data[~spy_data.index.duplicated(keep='first')]
+        spy_data = spy_data[~spy_data.index.duplicated(keep='last')].sort_index()
 
         aligned_spy = spy_data.reindex(df.index).ffill()
-        spy_returns = aligned_spy['Adj Close'].pct_change()
+        spy_close = aligned_spy['Adj Close'].astype(float)
+        spy_returns = spy_close.pct_change()
         stock_returns = df['return']
+
+        periods_per_day = 7 if interval == "1h" else 1
+        annualiser = np.sqrt(252 * (6.5 if interval == "1h" else 1.0))
+        p5, p21, p63, p126, p200, p252 = (
+            n * periods_per_day for n in (5, 21, 63, 126, 200, 252)
+        )
+
+        df['SPY_Return_5'] = spy_close.pct_change(p5)
+        df['SPY_Return_21'] = spy_close.pct_change(p21)
+        df['SPY_Return_63'] = spy_close.pct_change(p63)
+        df['SPY_Return_126'] = spy_close.pct_change(p126)
+        df['SPY_PDMA_50'] = spy_close / spy_close.rolling(50 * periods_per_day).mean() - 1.0
+        df['SPY_PDMA_200'] = spy_close / spy_close.rolling(p200).mean() - 1.0
+        df['SPY_Drawdown_252'] = spy_close / spy_close.rolling(p252).max() - 1.0
+        df['SPY_Realized_Vol_20'] = spy_returns.rolling(20 * periods_per_day).std() * annualiser
+        df['SPY_Realized_Vol_63'] = spy_returns.rolling(p63).std() * annualiser
+        df['SPY_Vol_Ratio'] = np.log(
+            (df['SPY_Realized_Vol_20'] + 1e-6) / (df['SPY_Realized_Vol_63'] + 1e-6)
+        ).clip(-1.5, 1.5)
 
         # Rolling Beta (60-period): Covariance(stock, market) / Variance(market)
         rolling_cov = stock_returns.rolling(window=60).cov(spy_returns)
@@ -370,21 +415,37 @@ class TechnicalAnalysisAccessor:
         df['Market_Beta'] = (rolling_cov / rolling_var + 1e-9).fillna(1.0)  # Assume 1.0 if no data
         df['Fear_Correlation'] = stock_returns.rolling(window=60).corr(df['VIX_Change']).fillna(0)
         df['Relative_Strength'] = (df['Adj Close'] / aligned_spy['Adj Close']).pct_change().fillna(0)
+        df['Relative_Strength_21'] = (
+            (df['Adj Close'] / spy_close).pct_change(p21)
+        )
+
+        bad_trend = df['SPY_PDMA_200'] < 0
+        stress = (
+            (df['VIX_Percentile_252'] >= 0.80)
+            | (df['SPY_Realized_Vol_20'] / (df['SPY_Realized_Vol_63'] + 1e-9) >= 1.25)
+        )
+        df['Regime_Bad_Trend'] = bad_trend.astype(int)
+        df['Regime_Stress'] = stress.astype(int)
+        df['Regime_Exposure'] = np.where(bad_trend, 0.5, 1.0) * np.where(stress, 0.5, 1.0)
 
         return df
 
     @staticmethod
     def _add_vix_plus(df: pd.DataFrame, interval: str):
         # Market fear volume context
-        vvix_data = pd.read_parquet(os.path.join(DATA_DIR, f'VVIX_{interval}.parquet'))
+        vvix_data = load_comparative_data("VVIX", interval)
         vvix_data.index.name = "Date"
         vvix_data.index = pd.to_datetime(vvix_data.index, utc=True).tz_localize(None)
-        vvix_data = vvix_data[~vvix_data.index.duplicated(keep='first')].sort_index()
+        vvix_data = vvix_data[~vvix_data.index.duplicated(keep='last')].sort_index()
 
-        aligned_vvix = vvix_data.reindex(df.index).ffill().bfill()
+        aligned_vvix = vvix_data.reindex(df.index).ffill()
 
         df['VVIX_Level'] = aligned_vvix['Adj Close']
         df['VIX_Quality_Ratio'] = df['VVIX_Level'] / df['VIX_Level']
+        periods_per_day = 7 if interval == "1h" else 1
+        vvix_mean = df['VVIX_Level'].rolling(252 * periods_per_day).mean()
+        vvix_std = df['VVIX_Level'].rolling(252 * periods_per_day).std()
+        df['VVIX_Z_252'] = (df['VVIX_Level'] - vvix_mean) / (vvix_std + 1e-9)
 
         return df
 
@@ -396,7 +457,7 @@ class TechnicalAnalysisAccessor:
         df = df[df.index.notna()]
         df = df[~df.index.duplicated(keep="first")].sort_index()
 
-        tyx_data = pd.read_parquet(os.path.join(DATA_DIR, f"TYX_{interval}.parquet"))
+        tyx_data = load_comparative_data("TYX", interval)
         tyx_data.index.name = "Date"
         tyx_data.index = pd.to_datetime(tyx_data.index, utc=True, errors="coerce").tz_localize(None)
         tyx_data = tyx_data[tyx_data.index.notna()]
@@ -430,5 +491,12 @@ class TechnicalAnalysisAccessor:
 
         merged = merged.set_index("Date")
         merged["Treasury_30Y"] = merged["Treasury_30Y"].ffill()
+        periods_per_day = 7 if interval == "1h" else 1
+        merged["Treasury_Change_21"] = merged["Treasury_30Y"].diff(21 * periods_per_day)
+        treasury_mean = merged["Treasury_30Y"].rolling(252 * periods_per_day).mean()
+        treasury_std = merged["Treasury_30Y"].rolling(252 * periods_per_day).std()
+        merged["Treasury_Z_252"] = (
+            (merged["Treasury_30Y"] - treasury_mean) / (treasury_std + 1e-9)
+        )
 
         return merged

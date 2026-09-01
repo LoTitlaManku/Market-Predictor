@@ -1,0 +1,5 @@
+==================================================
+ANCHORED OUT-OF-SAMPLE BACKTEST (1d): cutoff = 3 months (single fit)
+==================================================
+Loading all tickers...
+
