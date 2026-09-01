@@ -306,7 +306,124 @@ def repair_all_cache_csvs():
 
 ########################################################################################################################
 
-def plot_performance_metrics(csv_path: str):
+def find_latest_walk_forward(
+        interval: str = "1d", months: int | float = 12, model_dir=None,
+        include_experiments: bool = False,
+):
+    """Locate the newest completed walk-forward folder without hardcoded dates."""
+    import json
+    from pathlib import Path
+    from scripts.config import MODEL_DIR
+
+    root = Path(MODEL_DIR if model_dir is None else model_dir)
+    candidates = []
+    for path in root.glob(f"{interval} Model */walk_forward/{months}/summary.json"):
+        if not (path.parent / "daily_equity.csv").exists():
+            continue
+        metadata = json.loads(path.read_text(encoding="utf-8"))
+        if metadata.get("experiment_note") and not include_experiments:
+            continue
+        candidates.append(path.parent)
+    if not candidates:
+        raise FileNotFoundError(
+            f"No completed {interval} walk-forward result for {months} months in {root}"
+        )
+    return max(candidates, key=lambda path: (path / "summary.json").stat().st_mtime)
+
+
+def _zero_holding_runs(df):
+    import pandas as pd
+
+    zero = df["holdings"].eq(0)
+    groups = zero.ne(zero.shift()).cumsum()
+    runs = []
+    for _, group in df[zero].groupby(groups[zero]):
+        runs.append({
+            "start": pd.Timestamp(group["Date"].min()),
+            "end": pd.Timestamp(group["Date"].max()),
+            "bars": int(len(group)),
+        })
+    return pd.DataFrame(runs, columns=["start", "end", "bars"])
+
+
+def summarise_walk_forward(folder):
+    """Build a read-only monthly and signal-starvation report for one run."""
+    import json
+    from pathlib import Path
+    import pandas as pd
+
+    folder = Path(folder)
+    daily_path = folder / "daily_equity.csv"
+    if not daily_path.exists():
+        raise FileNotFoundError(f"Missing walk-forward equity file: {daily_path}")
+
+    daily = pd.read_csv(daily_path)
+    required = {"Date", "equity", "daily_return", "holdings", "turnover"}
+    missing = required - set(daily.columns)
+    if missing:
+        raise ValueError(f"daily_equity.csv is missing required columns: {sorted(missing)}")
+    daily["Date"] = pd.to_datetime(daily["Date"], errors="raise")
+    daily = daily.sort_values("Date").reset_index(drop=True)
+
+    for optional, default in (
+        ("gross_exposure", 0.0), ("regime_exposure", 1.0), ("gross_return", 0.0),
+    ):
+        if optional not in daily.columns:
+            daily[optional] = default
+
+    monthly_aggregations = {
+        "end_equity": ("equity", "last"),
+        "return_pct": ("daily_return", lambda values: ((1.0 + values).prod() - 1.0) * 100.0),
+        "avg_holdings": ("holdings", "mean"),
+        "avg_gross_exposure": ("gross_exposure", "mean"),
+        "avg_regime_exposure": ("regime_exposure", "mean"),
+        "total_turnover": ("turnover", "sum"),
+        "max_turnover": ("turnover", "max"),
+        "zero_holding_days": ("holdings", lambda values: int(values.eq(0).sum())),
+        "bars": ("holdings", "size"),
+    }
+    if "benchmark_return" in daily.columns:
+        monthly_aggregations["benchmark_return_pct"] = (
+            "benchmark_return", lambda values: ((1.0 + values).prod() - 1.0) * 100.0
+        )
+
+    monthly = (
+        daily.assign(month=daily["Date"].dt.to_period("M"))
+        .groupby("month", observed=True)
+        .agg(**monthly_aggregations)
+        .reset_index()
+    )
+
+    signal_path = folder / "signal_diagnostics.csv"
+    signals = pd.read_csv(signal_path, parse_dates=["Date", "model_as_of_date"]) \
+        if signal_path.exists() else pd.DataFrame()
+
+    trades_path = folder / "trades.csv"
+    trades = pd.read_csv(trades_path) if trades_path.exists() else pd.DataFrame()
+    exit_reasons = {}
+    if not trades.empty and "action" in trades.columns:
+        exits = trades[trades["action"].astype(str).str.startswith("EXIT")]
+        for reason in ("weak_long", "weak_short", "opposite_signal", "too_old"):
+            if reason in exits.columns:
+                values = exits[reason].astype(str).str.lower().eq("true")
+                exit_reasons[reason] = int(values.sum())
+        exit_reasons["missing"] = int(exits["action"].eq("EXIT_MISSING").sum())
+
+    summary_path = folder / "summary.json"
+    summary = json.loads(summary_path.read_text(encoding="utf-8")) if summary_path.exists() else {}
+    return {
+        "folder": folder,
+        "summary": summary,
+        "daily": daily,
+        "monthly": monthly,
+        "zero_holding_runs": _zero_holding_runs(daily),
+        "signals": signals,
+        "trades": trades,
+        "exit_reasons": exit_reasons,
+    }
+
+
+def plot_performance_metrics(csv_path: str, show: bool = True, save_path=None):
     import pandas as pd
     import matplotlib.pyplot as plt
 
@@ -314,20 +431,32 @@ def plot_performance_metrics(csv_path: str):
     df['Date'] = pd.to_datetime(df['Date'])
     df = df.sort_values('Date')
 
-    fig, axes = plt.subplots(3, 1, figsize=(12, 10), sharex=True)
+    fig, axes = plt.subplots(4, 1, figsize=(13, 12), sharex=True)
 
     # 1. Equity Curve
     axes[0].plot(df['Date'], df['equity'], label='Equity', color='tab:blue', linewidth=1.5)
+    if 'benchmark_equity' in df.columns:
+        axes[0].plot(df['Date'], df['benchmark_equity'], label='SPY Benchmark',
+                     color='tab:grey', linestyle='--', linewidth=1.0)
     axes[0].set_title('Portfolio Equity Curve')
     axes[0].set_ylabel('Equity (£)')
     axes[0].grid(True, alpha=0.3)
     axes[0].legend(loc='upper left')
+
+    drawdown = df['equity'] / df['equity'].cummax() - 1.0
+    drawdown_axis = axes[0].twinx()
+    drawdown_axis.fill_between(df['Date'], drawdown * 100.0, 0, color='tab:red', alpha=0.12)
+    drawdown_axis.set_ylabel('Drawdown (%)', color='tab:red')
+    drawdown_axis.set_ylim(min(-1.0, float(drawdown.min() * 120.0)), 0.0)
 
     # 2. Returns
     if 'daily_return' in df.columns:
         axes[1].plot(df['Date'], df['daily_return'], label='Daily Return', color='tab:green', alpha=0.7, linewidth=1)
     if 'gross_return' in df.columns:
         axes[1].plot(df['Date'], df['gross_return'], label='Gross Return', color='tab:orange', alpha=0.5, linewidth=1)
+    if 'benchmark_return' in df.columns:
+        axes[1].plot(df['Date'], df['benchmark_return'], label='SPY Return',
+                     color='tab:grey', alpha=0.5, linewidth=1)
     axes[1].set_title('Returns')
     axes[1].set_ylabel('Return')
     axes[1].grid(True, alpha=0.3)
@@ -346,17 +475,51 @@ def plot_performance_metrics(csv_path: str):
         ax3_twin.grid(False)
 
     axes[2].set_title('Turnover and Holdings')
-    axes[2].set_xlabel('Date')
     axes[2].grid(True, alpha=0.3)
 
+    # 4. Exposure explains whether low activity was a regime decision or a
+    # forecast/filter bottleneck.
+    if 'gross_exposure' in df.columns:
+        axes[3].plot(df['Date'], df['gross_exposure'], label='Gross Exposure',
+                     color='tab:blue', linewidth=1.2)
+    if 'regime_exposure' in df.columns:
+        axes[3].plot(df['Date'], df['regime_exposure'], label='Regime Limit',
+                     color='tab:orange', linestyle='--', linewidth=1.0)
+    axes[3].set_title('Portfolio and Regime Exposure')
+    axes[3].set_ylabel('Fraction')
+    axes[3].set_xlabel('Date')
+    axes[3].set_ylim(bottom=0)
+    axes[3].grid(True, alpha=0.3)
+    axes[3].legend(loc='upper left')
+
+    if 'holdings' in df.columns:
+        for _, run in _zero_holding_runs(df).iterrows():
+            for axis in axes:
+                axis.axvspan(run['start'], run['end'] + pd.Timedelta(days=1),
+                             color='grey', alpha=0.08)
+
     plt.tight_layout()
-    plt.show()
+    if save_path is not None:
+        fig.savefig(save_path, dpi=160, bbox_inches='tight')
+    if show:
+        plt.show()
+    return fig
 
 ########################################################################################################################
 
-if __name__ in "__main__":
+if __name__ == "__main__":
     import time
     start = time.perf_counter()
+
+    # import argparse
+    # parser = argparse.ArgumentParser(description="Inspect a completed walk-forward run")
+    # parser.add_argument("--interval", default="1d")
+    # parser.add_argument("--months", type=int, default=12)
+    # parser.add_argument("--folder", default=None)
+    # parser.add_argument("--save", default=None, help="Optional image output path")
+    # parser.add_argument("--no-show", action="store_true")
+    # parser.add_argument("--include-experiments", action="store_true")
+    # args = parser.parse_args()
 
     # import time_machine
     # from datetime import datetime, timezone
@@ -379,7 +542,31 @@ if __name__ in "__main__":
     # from folder_trees import generate_tree
     # generate_tree("/home/god/Projects/market_predictor", ignore_paths=[".bin", ".venv", "cache_files", "imgs"])
 
-    plot_performance_metrics("/home/god/Projects/market_predictor/model/1d Model [2026-09-01 14:55]/walk_forward/12/daily_equity.csv")
+    # result_folder = args.folder or find_latest_walk_forward(
+    #     args.interval, args.months, include_experiments=args.include_experiments
+    # )
+    # report = summarise_walk_forward(result_folder)
+    # print(f"Result: {report['folder']}")
+    # print(report["monthly"].to_string(index=False))
+    # if not report["zero_holding_runs"].empty:
+    #     print("\nZero-holding runs:")
+    #     print(report["zero_holding_runs"].to_string(index=False))
+    # if report["exit_reasons"]:
+    #     print(f"\nExit reasons: {report['exit_reasons']}")
+    # if not report["signals"].empty:
+    #     print("\nLatest signal funnel:")
+    #     print(report["signals"].tail(10).to_string(index=False))
+
+    # plot_performance_metrics(
+    #     str(report["folder"] / "daily_equity.csv"),
+    #     show=not args.no_show,
+    #     save_path=args.save,
+    # )
+
+    plot_performance_metrics(
+        "/home/god/Projects/market_predictor/model/1d Model [2026-09-01 20:11]/walk_forward/12/daily_equity.csv",
+        show=True,
+    )
 
     print(time.perf_counter() - start)
     pass

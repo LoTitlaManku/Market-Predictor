@@ -28,7 +28,7 @@ class Settings:
     GPU = {"LGBM": False, "CAT": False}
     Threaded = False
 
-MODEL_PIPELINE_VERSION = 3
+MODEL_PIPELINE_VERSION = 4
 
 @dataclass
 class UniverseConfig:
@@ -55,6 +55,13 @@ class UniverseConfig:
     target_clip: float = 3.0
     max_training_years: int = 10
     recency_half_life_days: float = 1095.0
+
+    # Periodic fitting is available for robustness experiments, but remains
+    # opt-in because the current held-out comparison favours the anchored fit.
+    retrain_every_n_bars_1d: int = 0
+    retrain_every_n_bars_1h: int = 0
+    max_loaded_model_age_days_1d: int = 45
+    max_loaded_model_age_days_1h: int = 7
 
     ensemble_cat_weight: float = 0.5
     ensemble_top_n: int = 50
@@ -186,6 +193,10 @@ class DataManager:
 
         df["future_return"] = close.shift(-self.config.horizon) / close - 1.0
         df["benchmark_future_return"] = (benchmark_close.shift(-self.config.horizon) / benchmark_close - 1.0)
+        # The source row's label is not observable until this date.  Rolling
+        # retraining filters on it so the horizon can never cross a model's
+        # as-of date (the usual purged walk-forward requirement).
+        df["target_end_date"] = pd.Series(df.index, index=df.index).shift(-self.config.horizon)
 
         if isinstance(beta, pd.Series):
             beta_used = beta.reindex(df.index).ffill()
@@ -328,6 +339,7 @@ class DataManager:
             target_cols = {
                 "future_return", "benchmark_future_return", "target_excess_return",
                 "target_risk_adjusted_return", "target_risk_adjusted_excess_return",
+                "target_end_date",
             }
             non_target_cols = [c for c in data.columns if c not in target_cols]
             data = data.dropna(subset=non_target_cols)
@@ -385,6 +397,8 @@ class Trainer:
         self.predictor = Predictor(interval, self.config)
         self.manager = DataManager(self.config)
         self.interval = interval
+        self.prepared_data: pd.DataFrame | None = None
+        self.retraining_records: list[dict[str, Any]] = []
 
     @staticmethod
     def calculate_gross_return(
@@ -515,21 +529,49 @@ class Trainer:
         if not frames: raise ValueError("No execution returns could be calculated.")
         return pd.concat(frames, axis=0, ignore_index=True).sort_values(["Date", "ticker"])
 
-    def prepare_predictor(self, train_data: pd.DataFrame, full_data: pd.DataFrame, cutoff_date: pd.Timestamp) -> pd.DataFrame:
+    @staticmethod
+    def add_benchmark_performance(daily_df: pd.DataFrame, interval: str) -> pd.DataFrame:
+        """Attach SPY returns using the same next-open-to-following-open clock."""
+        benchmark = load_comparative_data("SPY", interval).copy()
+        benchmark.index = pd.to_datetime(benchmark.index, utc=True).tz_localize(None)
+        benchmark = benchmark[~benchmark.index.duplicated(keep="last")].sort_index()
+
+        if "Adj Open" in benchmark.columns:
+            benchmark_open = benchmark["Adj Open"].astype(float)
+        elif {"Open", "Close", "Adj Close"}.issubset(benchmark.columns):
+            adjustment = benchmark["Adj Close"].astype(float) / benchmark["Close"].astype(float)
+            benchmark_open = benchmark["Open"].astype(float) * adjustment
+        elif "Open" in benchmark.columns:
+            benchmark_open = benchmark["Open"].astype(float)
+        else:
+            raise ValueError("SPY comparative data has no usable open price")
+
+        dates = pd.to_datetime(daily_df["Date"]).to_numpy(dtype="datetime64[ns]")
+        benchmark_dates = benchmark.index.to_numpy(dtype="datetime64[ns]")
+        opens = benchmark_open.to_numpy(dtype=float)
+        entry_idx = np.searchsorted(benchmark_dates, dates, side="right")
+        exit_idx = entry_idx + 1
+        valid = exit_idx < len(benchmark)
+
+        benchmark_return = np.zeros(len(daily_df), dtype=float)
+        benchmark_return[valid] = opens[exit_idx[valid]] / opens[entry_idx[valid]] - 1.0
+        result = daily_df.copy()
+        result["benchmark_return"] = benchmark_return
+        result["benchmark_equity"] = 1000.0 * (1.0 + result["benchmark_return"]).cumprod()
+        return result
+
+    def prepare_predictor(self, full_data: pd.DataFrame, cutoff_date: pd.Timestamp) -> pd.DataFrame:
         cutoff_date: pd.Timestamp = pd.Timestamp(cutoff_date)  # noqa
 
-        train_data = train_data.copy()
         full_data = full_data.copy()
-
-        train_data["Date"] = pd.to_datetime(train_data["Date"])
         full_data["Date"] = pd.to_datetime(full_data["Date"])
+        full_data["target_end_date"] = pd.to_datetime(full_data["target_end_date"])
 
         walk_data = full_data[full_data["Date"] > cutoff_date].copy()
 
-        if train_data.empty: raise ValueError("No training rows before cutoff date.")
         if walk_data.empty: raise ValueError("No walk-forward rows after cutoff date.")
 
-        data = pd.concat([train_data, walk_data], axis=0, ignore_index=True)
+        data = full_data
         rank_pct = data.groupby("Date")["rolling_vol"].rank(method="first", pct=True)
 
         data["profile_group"] = pd.cut(
@@ -548,6 +590,7 @@ class Trainer:
             "ticker", "Date", "profile_group",
             "future_return", "benchmark_future_return", "target_excess_return",
             "target_risk_adjusted_return", "target_risk_adjusted_excess_return",
+            "target_end_date",
             "target_profit", "tbm_return", "barrier_strength",
             "time_to_gain", "time_to_loss", "tp_return", "sl_return",
             "dollar_volume", "rolling_dollar_volume", "abs_bar_return", "target_beta_used",
@@ -557,9 +600,7 @@ class Trainer:
         self.predictor.feature_cols = [c for c in data.columns if
                                 c not in drop_cols and pd.api.types.is_numeric_dtype(data[c])]
 
-        train_df = data[
-            (data["Date"] <= cutoff_date) & data[self.config.target_column].notna()
-        ].copy()
+        train_df = data[data["Date"] <= cutoff_date].copy()
         walk_df = data[data["Date"] > cutoff_date].copy()
 
         if train_df.empty: raise ValueError("No labelled training rows before cutoff date.")
@@ -568,6 +609,7 @@ class Trainer:
         self.predictor.split_date = cutoff_date
         self.predictor.test_df = walk_df
         self.predictor.set_training_frame(train_df, cutoff_date)
+        self.prepared_data = data
 
         log(f"Walk-forward cutoff date: {cutoff_date.strftime('%Y-%m-%d')}")
         log(f"Train rows: {len(self.predictor.train_df):,}")
@@ -576,9 +618,109 @@ class Trainer:
 
         return walk_df
 
+    def retrain_frequency(self) -> int:
+        return (
+            self.config.retrain_every_n_bars_1h
+            if self.interval == "1h"
+            else self.config.retrain_every_n_bars_1d
+        )
+
+    @staticmethod
+    def trim_unexecutable_tail(
+            walk_df: pd.DataFrame, required_future_bars: int = 2
+    ) -> pd.DataFrame:
+        """Drop signal dates that cannot have a complete next-open return."""
+        dates = list(sorted(pd.to_datetime(walk_df["Date"]).unique()))
+        if len(dates) <= required_future_bars:
+            raise ValueError("Walk-forward window has no executable signal dates")
+        executable_dates = set(dates[:-required_future_bars])
+        return walk_df[walk_df["Date"].isin(executable_dates)].copy()
+
+    @staticmethod
+    def make_retraining_folds(
+            evaluation_dates: list[pd.Timestamp], cutoff_date: pd.Timestamp,
+            retrain_every_n_bars: int,
+    ) -> list[dict[str, Any]]:
+        """Return strictly out-of-sample prediction folds.
+
+        A refit made after one completed signal close is first used on the next
+        signal date.  Non-positive cadence preserves the anchored one-fit mode.
+        """
+        dates = [pd.Timestamp(date) for date in sorted(pd.to_datetime(evaluation_dates).unique())]
+        if not dates:
+            return []
+
+        cadence = len(dates) if retrain_every_n_bars <= 0 else retrain_every_n_bars
+        folds: list[dict[str, Any]] = []
+        for start in range(0, len(dates), cadence):
+            segment = dates[start:start + cadence]
+            model_as_of = pd.Timestamp(cutoff_date) if start == 0 else dates[start - 1]
+            folds.append({
+                "fold": len(folds),
+                "model_as_of_date": model_as_of,
+                "prediction_dates": segment,
+            })
+        return folds
+
+    def predict_with_retraining(
+            self, walk_df: pd.DataFrame, cutoff_date: pd.Timestamp
+    ) -> pd.DataFrame:
+        if self.prepared_data is None:
+            raise ValueError("Prepared feature data is not available")
+
+        evaluation_dates = list(sorted(pd.to_datetime(walk_df["Date"]).unique()))
+        cadence = self.retrain_frequency()
+        folds = self.make_retraining_folds(evaluation_dates, cutoff_date, cadence)
+        predicted: list[pd.DataFrame] = []
+        self.retraining_records = []
+
+        for fold in folds:
+            as_of = pd.Timestamp(fold["model_as_of_date"])
+            prediction_dates = fold["prediction_dates"]
+            train_df = self.prepared_data[self.prepared_data["Date"] <= as_of].copy()
+            self.predictor.set_training_frame(train_df, as_of)
+            self.predictor.split_date = as_of
+
+            log(
+                f"Training fold {fold['fold'] + 1}/{len(folds)} as of "
+                f"{as_of:%Y-%m-%d} for {len(prediction_dates)} prediction bars..."
+            )
+            cat_model = self.predictor.train_model("CAT")
+            lgbm_model = self.predictor.train_model("LGBM")
+
+            segment = walk_df[walk_df["Date"].isin(prediction_dates)].copy()
+            X_segment = segment[self.predictor.feature_cols].to_numpy(dtype=np.float32)
+            segment["pred_cat"] = cat_model.predict(X_segment)
+            segment["pred_lgbm"] = lgbm_model.predict(X_segment)
+            segment["model_as_of_date"] = as_of
+            segment["retrain_fold"] = int(fold["fold"])
+            predicted.append(segment)
+
+            max_label_end = pd.to_datetime(self.predictor.train_df["target_end_date"]).max()
+            self.retraining_records.append({
+                "fold": int(fold["fold"]),
+                "model_as_of_date": as_of,
+                "prediction_start": min(prediction_dates),
+                "prediction_end": max(prediction_dates),
+                "prediction_bars": len(prediction_dates),
+                "training_rows": len(self.predictor.train_df),
+                "latest_training_feature_date": pd.to_datetime(self.predictor.train_df["Date"]).max(),
+                "latest_label_end_date": max_label_end,
+            })
+
+            del cat_model, lgbm_model
+            flush_memory()
+
+        if not predicted:
+            raise ValueError("No walk-forward predictions were generated")
+        return pd.concat(predicted, ignore_index=True).sort_values(["Date", "ticker"])
+
     def save_results(
             self, months_back: int | float, summary: dict, daily_df: pd.DataFrame,
-            trades_df: pd.DataFrame, position_df: pd.DataFrame | None = None, attribution: dict | None = None
+            trades_df: pd.DataFrame, position_df: pd.DataFrame | None = None,
+            attribution: dict | None = None, signal_df: pd.DataFrame | None = None,
+            retraining_df: pd.DataFrame | None = None,
+            predictions_df: pd.DataFrame | None = None,
     ) -> Path:
 
         folder = Path(MODEL_DIR) / f"{self.interval} Model [{now}]" / "walk_forward" / str(months_back)
@@ -586,6 +728,21 @@ class Trainer:
 
         daily_df.to_csv(folder / "daily_equity.csv", index=False)
         trades_df.to_csv(folder / "trades.csv", index=False)
+        if signal_df is not None:
+            signal_df.to_csv(folder / "signal_diagnostics.csv", index=False)
+        if retraining_df is not None:
+            retraining_df.to_csv(folder / "retraining_folds.csv", index=False)
+        if predictions_df is not None:
+            prediction_cols = [
+                "Date", "ticker", "model_as_of_date", "retrain_fold",
+                "pred", "pred_raw", "pred_cat", "pred_lgbm", "ensemble_score",
+                "ensemble_agreement", "risk_eligible", "entry_eligible",
+                "rolling_vol", "rolling_beta", "vol_rank_pct", "target_weight",
+                "regime_exposure", "position_risk_scale", "exec_return",
+            ]
+            predictions_df[[
+                col for col in prediction_cols if col in predictions_df.columns
+            ]].to_parquet(folder / "walk_forward_predictions.parquet", index=False)
 
         if position_df is not None and not position_df.empty:
             position_df.to_csv(folder / "position_returns.csv", index=False)
@@ -612,7 +769,14 @@ class Trainer:
         log(f"Saved walk-forward results to: {folder}")
         return folder
 
-    def run_training(self, months_back: int | float) -> dict[str, Any]:
+    def run_training(
+            self, months_back: int | float, retrain_every_n_bars: int | None = None
+    ) -> dict[str, Any]:
+        if retrain_every_n_bars is not None:
+            if self.interval == "1h":
+                self.config.retrain_every_n_bars_1h = int(retrain_every_n_bars)
+            else:
+                self.config.retrain_every_n_bars_1d = int(retrain_every_n_bars)
         if self.interval == "1d":
             self.config.horizon = 40
             self.config.max_top_tickers = 30
@@ -621,9 +785,14 @@ class Trainer:
             self.config.max_top_tickers = 10
 
         model_type = "ENSEMBLE"
+        retrain_every_n_bars = self.retrain_frequency()
+        retraining_name = (
+            f"periodic expanding fit every {retrain_every_n_bars} bars"
+            if retrain_every_n_bars > 0 else "single fit at cutoff"
+        )
         log(
-            f"{'=' * 50}\nANCHORED OUT-OF-SAMPLE BACKTEST ({self.interval}): "
-            f"cutoff = {months_back} months (single fit)\n{'=' * 50}"
+            f"{'=' * 50}\nPURGED WALK-FORWARD BACKTEST ({self.interval}): "
+            f"cutoff = {months_back} months ({retraining_name})\n{'=' * 50}"
         )
 
         log("Loading all tickers...")
@@ -641,30 +810,14 @@ class Trainer:
         log(f"Latest available date: {latest_date.strftime('%Y-%m-%d')}")
         log(f"Cutoff date: {cutoff_date.strftime('%Y-%m-%d')}")
 
-        # Construct training universe up to the split date
-        log("Building training universe up to cutoff...")
-        train_data = self.manager.build_universe(self.interval, data_dict, True, cutoff_date)
-
-        # Construct full evaluation dataset across entire timeline
-        log("Building full universe for walk-forward predictions...")
+        # Build features once.  target_end_date controls which labels are
+        # actually available at each later refit.
+        log("Building full point-in-time universe...")
         full_data = self.manager.build_universe(self.interval, data_dict, False)
 
-        walk_df = self.prepare_predictor(train_data, full_data, cutoff_date)
-
-        # Slice features for out-of-sample predictions.  Keep the same position
-        # limit used by paper execution; vacant slots remain cash.
-        X_walk = walk_df[self.predictor.feature_cols].to_numpy(dtype=np.float32)
-        walk_df = walk_df.copy()
-
-        log("Training CAT up to cutoff...")
-        cat_model = self.predictor.train_model("CAT")
-
-        log("Training LGBM up to cutoff...")
-        lgbm_model = self.predictor.train_model("LGBM")
-
-        # Generate predictions across the walk-forward window
-        walk_df["pred_cat"] = cat_model.predict(X_walk)
-        walk_df["pred_lgbm"] = lgbm_model.predict(X_walk)
+        walk_df = self.prepare_predictor(full_data, cutoff_date)
+        walk_df = self.trim_unexecutable_tail(walk_df)
+        walk_df = self.predict_with_retraining(walk_df, cutoff_date)
 
         # Merge model scores and calculate execution returns
         walk_df = self.predictor.add_ensemble_predictions(walk_df)
@@ -680,7 +833,8 @@ class Trainer:
         daily_rows = []
         trade_rows = []
         position_rows = []
-        for date in dates[:-1]:
+        signal_rows = []
+        for date in dates:
             # Get predictions/returns for this date and drop invalid records
             day = by_date[date].copy()
             day = day.dropna(subset=["pred", "exec_return", "exec_entry_price_mid", "exec_exit_price_mid"])
@@ -705,6 +859,12 @@ class Trainer:
                 candidates = candidates.sort_values("score", ascending=False)
 
             turnover = 0
+            entries = 0
+            replacements = 0
+            exits_missing = 0
+            exits_opposite = 0
+            exits_weak = 0
+            exits_age = 0
 
             # Scan and manage open portfolio positions
             for ticker in list(holdings.keys()):
@@ -712,6 +872,7 @@ class Trainer:
                 if ticker not in exit_signal_day.index:
                     holdings.pop(ticker)
                     turnover += 1
+                    exits_missing += 1
                     trade_rows.append({"Date": date, "ticker": ticker, "action": "EXIT_MISSING"})
                     continue
 
@@ -729,6 +890,9 @@ class Trainer:
                 if opposite_signal or weak_long or weak_short or too_old:  # noqa
                     holdings.pop(ticker)
                     turnover += 1
+                    exits_opposite += int(bool(opposite_signal))
+                    exits_weak += int(bool(weak_long or weak_short))
+                    exits_age += int(bool(too_old))
 
                     trade_rows.append({
                         "Date": date, "ticker": ticker, "action": "EXIT", "opposite_signal": bool(opposite_signal),
@@ -751,6 +915,7 @@ class Trainer:
                 if len(holdings) < self.config.max_top_tickers:
                     holdings[ticker] = {"side": side, "score": score, "age": 0}
                     turnover += 1
+                    entries += 1
 
                     trade_rows.append({
                         "Date": date, "ticker": ticker, "action": "BUY" if side == 1 else "SHORT",
@@ -768,6 +933,8 @@ class Trainer:
                     holdings.pop(weakest_ticker)
                     holdings[ticker] = {"side": side, "score": score, "age": 0}
                     turnover += 2
+                    entries += 1
+                    replacements += 1
 
                     trade_rows.append({"Date": date, "ticker": weakest_ticker, "action": "REPLACE_EXIT"})
                     trade_rows.append({
@@ -848,6 +1015,36 @@ class Trainer:
                 "held_tickers": ",".join(sorted(holdings.keys())),
             })
 
+            both_positive = (signalled["pred_cat"] > self.config.min_abs_pred) & (
+                signalled["pred_lgbm"] > self.config.min_abs_pred
+            )
+            positive_agreement = both_positive & signalled["ensemble_agreement"].eq(1)
+            signal_rows.append({
+                "Date": date,
+                "model_as_of_date": pd.to_datetime(signalled["model_as_of_date"]).max(),
+                "retrain_fold": int(signalled["retrain_fold"].max()),
+                "universe_rows": int(len(signalled)),
+                "pred_cat_positive": int((signalled["pred_cat"] > self.config.min_abs_pred).sum()),
+                "pred_lgbm_positive": int((signalled["pred_lgbm"] > self.config.min_abs_pred).sum()),
+                "both_models_positive": int(both_positive.sum()),
+                "positive_agreement": int(positive_agreement.sum()),
+                "risk_eligible": int(signalled["risk_eligible"].eq(1).sum()),
+                "agreement_and_risk_eligible": int(signalled["entry_eligible"].eq(1).sum()),
+                "quantile_long_signals": int(signalled["pred_signal"].eq(1).sum()),
+                "final_candidates": int(len(candidates)),
+                "entries": entries,
+                "replacements": replacements,
+                "exits_missing": exits_missing,
+                "exits_opposite": exits_opposite,
+                "exits_weak": exits_weak,
+                "exits_age": exits_age,
+                "holdings": len(holdings),
+                "gross_exposure": float(sum(row["weight"] for row in position_details)),
+                "regime_exposure": float(day["regime_exposure"].median()),
+                "median_pred_raw": float(signalled["pred_raw"].median()),
+                "max_pred_raw": float(signalled["pred_raw"].max()),
+            })
+
             # Increment active position lifetime counters
             for info in holdings.values(): info["age"] += 1
 
@@ -855,18 +1052,25 @@ class Trainer:
         daily_df = pd.DataFrame(daily_rows)
         trades_df = pd.DataFrame(trade_rows)
         position_df = pd.DataFrame(position_rows)
+        signal_df = pd.DataFrame(signal_rows)
 
         if daily_df.empty: raise ValueError("Walk-forward produced no daily rows.")
 
         # Sort aggregated performance results sequentially by timestamp
         daily_df["Date"] = pd.to_datetime(daily_df["Date"])
         daily_df = daily_df.sort_values("Date")
+        daily_df = self.add_benchmark_performance(daily_df, self.interval)
 
         # Compute max drawdown curves and overall backtest performance
         returns = daily_df["daily_return"].astype(float)
         equity_curve = daily_df["equity"].astype(float)
         drawdown = equity_curve / equity_curve.cummax() - 1.0
         total_return = equity / 1000.0 - 1.0
+        benchmark_returns = daily_df["benchmark_return"].astype(float)
+        benchmark_equity = daily_df["benchmark_equity"].astype(float)
+        benchmark_drawdown = benchmark_equity / benchmark_equity.cummax() - 1.0
+        benchmark_total_return = float(benchmark_equity.iloc[-1] / 1000.0 - 1.0)
+        active_daily_return = returns - benchmark_returns
 
         # Configure time normalization metrics matching execution intervals
         multiplier = 6.5 if self.interval == "1h" else 1
@@ -876,13 +1080,29 @@ class Trainer:
         # Generate standardized portfolio tracking analytics
         cagr_like = (equity / 1000.0) ** (1 / years) - 1.0 if years > 0 else 0.0
         sharpe_like = returns.mean() / (returns.std() + 1e-9) * annualiser  # noqa
+        information_ratio_like = (
+            active_daily_return.mean() / (active_daily_return.std() + 1e-9) * annualiser
+        )
         attribution = self.analyse_pos_attr(position_df)
+        zero_holdings = daily_df["holdings"].eq(0)
+        zero_groups = zero_holdings.ne(zero_holdings.shift()).cumsum()
+        longest_zero_streak = int(
+            zero_holdings.groupby(zero_groups).sum().max()
+        ) if zero_holdings.any() else 0
+        retraining_df = pd.DataFrame(self.retraining_records)
+        retraining_mode = (
+            f"periodic_expanding_every_{retrain_every_n_bars}_bars"
+            if retrain_every_n_bars > 0 else "single_fit_at_cutoff"
+        )
 
         # Build output metadata dict package
         summary = {
             "interval": self.interval,
             "model_type": model_type,
-            "retraining": "single_fit_at_cutoff",
+            "retraining": retraining_mode,
+            "retrain_every_n_bars": int(retrain_every_n_bars),
+            "model_fit_count": int(len(retraining_df)),
+            "feature_count": int(len(self.predictor.feature_cols)),
             "target_column": self.config.target_column,
             "months_back": months_back,
             "cutoff_date": cutoff_date.strftime("%Y-%m-%d"),
@@ -892,9 +1112,13 @@ class Trainer:
             "final_equity": float(equity),
             "profit_loss": float(equity - 1000.0),
             "total_return": float(total_return),
+            "benchmark_total_return": benchmark_total_return,
+            "active_total_return": float(total_return - benchmark_total_return),
             "cagr_like": float(cagr_like),
             "sharpe_like": float(sharpe_like),
+            "information_ratio_like": float(information_ratio_like),
             "max_drawdown": float(drawdown.min()),
+            "benchmark_max_drawdown": float(benchmark_drawdown.min()),
             "win_rate": (returns > 0).mean(),
             "mean_daily_return": returns.mean(),
             "median_daily_return": returns.median(),
@@ -902,16 +1126,30 @@ class Trainer:
             "avg_gross_exposure": float(daily_df["gross_exposure"].mean()),
             "avg_regime_exposure": float(daily_df["regime_exposure"].mean()),
             "avg_turnover": float(daily_df["turnover"].mean()),
+            "max_daily_turnover": int(daily_df["turnover"].max()),
+            "zero_holding_days": int(zero_holdings.sum()),
+            "longest_zero_holding_streak": longest_zero_streak,
+            "no_candidate_days": int(signal_df["final_candidates"].eq(0).sum()),
+            "avg_daily_candidates": float(signal_df["final_candidates"].mean()),
             "trade_count": int(len(trades_df)),
             "attribution_concentration": attribution["concentration"],
         }
 
         # Save serialized simulation logs directly to workspace paths
-        self.save_results(months_back, summary, daily_df, trades_df, position_df, attribution)
+        self.save_results(
+            months_back, summary, daily_df, trades_df, position_df, attribution,
+            signal_df=signal_df, retraining_df=retraining_df, predictions_df=walk_df,
+        )
 
         log("Walk-forward summary:")
         log(json.dumps(json_safe(summary), indent=4))
-        return {"summary": summary, "daily": daily_df, "trades": trades_df}
+        return {
+            "summary": summary,
+            "daily": daily_df,
+            "trades": trades_df,
+            "signals": signal_df,
+            "retraining": retraining_df,
+        }
 
 class Predictor:
     def __init__(self, interval: str, config: UniverseConfig | None = None):
@@ -956,13 +1194,24 @@ class Predictor:
         target_col = self.config.target_column
         if target_col not in train_df.columns:
             raise ValueError(f"Configured target column is missing: {target_col}")
+        if "target_end_date" not in train_df.columns:
+            raise ValueError("target_end_date is required for leakage-safe training")
 
         reference_date = pd.Timestamp(reference_date)
+        target_end_date = pd.to_datetime(train_df["target_end_date"], errors="coerce")
+        eligible = (
+            train_df[target_col].notna()
+            & target_end_date.notna()
+            & target_end_date.le(reference_date)
+        )
+        train_df = train_df.loc[eligible].copy()
         if self.config.max_training_years > 0:
             history_start = reference_date - pd.DateOffset(years=self.config.max_training_years)
             train_df = train_df[pd.to_datetime(train_df["Date"]) >= history_start].copy()
         if train_df.empty:
             raise ValueError("No rows remain after applying the training-history window")
+        if pd.to_datetime(train_df["target_end_date"]).max() > reference_date:
+            raise AssertionError("Training labels cross the model as-of date")
 
         self.train_df = train_df
         self.X_train = train_df[self.feature_cols].to_numpy(dtype=np.float32)
@@ -990,6 +1239,7 @@ class Predictor:
             "ticker", "Date", "profile_group",
             "future_return", "benchmark_future_return", "target_excess_return",
             "target_risk_adjusted_return", "target_risk_adjusted_excess_return",
+            "target_end_date",
             "target_profit", "tbm_return", "barrier_strength",
             "time_to_gain", "time_to_loss", "tp_return", "sl_return",
             "dollar_volume", "rolling_dollar_volume", "abs_bar_return", "target_beta_used",
@@ -1104,6 +1354,7 @@ class Predictor:
                     f"version {MODEL_PIPELINE_VERSION} is required. Retrain before paper prediction."
                 )
             self.split_date = pd.Timestamp(metadata.get("end_date"))
+            self.as_of_date = pd.Timestamp(metadata.get("as_of_date"))
         else:
             raise ValueError(
                 f"Model {model_folder.name} has no metadata; retrain with pipeline "
@@ -1130,6 +1381,7 @@ class Predictor:
         df["pred_raw"] = cat_weight * df["pred_cat"] + lgbm_weight * df["pred_lgbm"]
         df["pred"] = df["pred_raw"]
         df["ensemble_agreement"] = 0
+        df["risk_eligible"] = 0
         df["entry_eligible"] = 0
         df["ensemble_score"] = (
             cat_weight * df["cat_rank_pct"] + lgbm_weight * df["lgbm_rank_pct"]
@@ -1164,6 +1416,7 @@ class Predictor:
                 & group["rolling_beta"].abs().le(self.config.max_entry_abs_beta)
                 & df.loc[group.index, "vol_rank_pct"].le(self.config.max_entry_vol_percentile)
             )
+            df.loc[group.index[risk_ok], "risk_eligible"] = 1
             eligible_idx = group.index[risk_ok].intersection(agreement_idx)
             df.loc[eligible_idx, "entry_eligible"] = 1
 
@@ -1179,6 +1432,19 @@ class Predictor:
         pred_data = self._prepare_data(pred_data, train=False)
 
         latest_date: pd.Timestamp = pred_data["Date"].max()
+        if self.as_of_date is not None:
+            max_age_days = (
+                self.config.max_loaded_model_age_days_1h
+                if self.interval == "1h"
+                else self.config.max_loaded_model_age_days_1d
+            )
+            model_age = latest_date - pd.Timestamp(self.as_of_date)
+            if model_age > pd.Timedelta(days=max_age_days):
+                raise ValueError(
+                    f"Loaded model is stale: as-of {pd.Timestamp(self.as_of_date):%Y-%m-%d}, "
+                    f"prediction date {latest_date:%Y-%m-%d}, maximum age {max_age_days} days. "
+                    "Retrain before producing paper orders."
+                )
         latest = pred_data[pred_data["Date"] == latest_date].copy()
 
         X_latest = latest[self.feature_cols].to_numpy(dtype=np.float32)
@@ -1204,7 +1470,8 @@ class Predictor:
             "signal_date", "ticker", "paper_action", "target_weight",
             "pred", "pred_raw", "pred_cat", "pred_lgbm",
             "ensemble_score", "cat_rank_pct", "lgbm_rank_pct",
-            "regime_exposure", "position_risk_scale", "rolling_vol", "rolling_beta",
+            "risk_eligible", "entry_eligible", "regime_exposure",
+            "position_risk_scale", "rolling_vol", "rolling_beta",
         ]
         picks = picks[[c for c in cols if c in picks.columns]]
 
@@ -1213,6 +1480,32 @@ class Predictor:
 
         latest.to_parquet(pred_dir / f"all_predictions_{self.interval}_{date_str}.parquet", index=False)
         latest.to_parquet(pred_dir / "latest_all_predictions.parquet", index=False)
+
+        both_positive = (latest["pred_cat"] > self.config.min_abs_pred) & (
+            latest["pred_lgbm"] > self.config.min_abs_pred
+        )
+        diagnostics = {
+            "Date": latest_date,
+            "model_as_of_date": self.as_of_date,
+            "universe_rows": len(latest),
+            "pred_cat_positive": int((latest["pred_cat"] > self.config.min_abs_pred).sum()),
+            "pred_lgbm_positive": int((latest["pred_lgbm"] > self.config.min_abs_pred).sum()),
+            "both_models_positive": int(both_positive.sum()),
+            "positive_agreement": int((both_positive & latest["ensemble_agreement"].eq(1)).sum()),
+            "risk_eligible": int(latest["risk_eligible"].eq(1).sum()),
+            "agreement_and_risk_eligible": int(latest["entry_eligible"].eq(1).sum()),
+            "quantile_long_signals": int(latest["pred_signal"].eq(1).sum()),
+            "final_candidates": len(picks),
+            "regime_exposure": float(latest["regime_exposure"].median()),
+            "median_pred_raw": float(latest["pred_raw"].median()),
+            "max_pred_raw": float(latest["pred_raw"].max()),
+        }
+        (pred_dir / f"signal_diagnostics_{self.interval}_{date_str}.json").write_text(
+            json.dumps(json_safe(diagnostics), indent=4), encoding="utf-8"
+        )
+        (pred_dir / "latest_signal_diagnostics.json").write_text(
+            json.dumps(json_safe(diagnostics), indent=4), encoding="utf-8"
+        )
 
         picks.to_csv(pred_dir / f"paper_signals_{self.interval}_{date_str}.csv", index=False)
         picks.to_csv(pred_dir / "latest_paper_signals.csv", index=False)
@@ -1420,6 +1713,20 @@ class Predictor:
 ########################################################################################################################
 
 if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Run purged stock-model walk-forward tests")
+    parser.add_argument("--months", nargs="+", type=int, default=[3,6,12])
+    parser.add_argument(
+        "--retrain-bars", type=int, default=None,
+        help="Optional refit cadence in signal bars; omit for one anchored fit",
+    )
+    parser.add_argument(
+        "--anchored", action="store_true",
+        help="Use one model fitted at the initial cutoff (quick diagnostic)",
+    )
+    args = parser.parse_args()
+
     start = time.perf_counter()
 
     # print("Training...")
@@ -1427,7 +1734,8 @@ if __name__ == "__main__":
     # mng.run_pipeline()
 
     trainer = Trainer("1d")
-    for mon in [6,12]:
-        trainer.run_training(months_back=mon)
+    cadence = 0 if args.anchored else args.retrain_bars
+    for mon in args.months:
+        trainer.run_training(months_back=mon, retrain_every_n_bars=cadence)
 
     print(f"Total time: {time.perf_counter() - start:.1f}s")

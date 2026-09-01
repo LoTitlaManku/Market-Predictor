@@ -1,0 +1,198 @@
+==================================================
+PURGED WALK-FORWARD BACKTEST (1d): cutoff = 3 months (single fit at cutoff)
+==================================================
+Loading all tickers...
+
+
+Latest available date: 2026-08-31
+Cutoff date: 2026-05-31
+Building full point-in-time universe...
+
+
+Walk-forward cutoff date: 2026-05-31
+Train rows: 1,625,637
+Walk-forward rows: 48,077
+Features: 92
+Training fold 1/1 as of 2026-05-31 for 62 prediction bars...
+
+
+Saved walk-forward results to: /home/god/Projects/market_predictor/model/1d Model [2026-09-01 20:11]/walk_forward/3
+Walk-forward summary:
+{
+    "interval": "1d",
+    "model_type": "ENSEMBLE",
+    "retraining": "single_fit_at_cutoff",
+    "retrain_every_n_bars": 0,
+    "model_fit_count": 1,
+    "feature_count": 92,
+    "target_column": "target_risk_adjusted_return",
+    "months_back": 3,
+    "cutoff_date": "2026-05-31",
+    "start_date": "2026-06-01",
+    "end_date": "2026-08-27",
+    "initial_capital": 1000.0,
+    "final_equity": 991.9907852372925,
+    "profit_loss": -8.00921476270753,
+    "total_return": -0.00800921476270755,
+    "benchmark_total_return": 0.016217044426050986,
+    "active_total_return": -0.024226259188758537,
+    "cagr_like": -0.032156276289346475,
+    "sharpe_like": -0.4602943348992364,
+    "information_ratio_like": -0.8547847095594687,
+    "max_drawdown": -0.03276610317980899,
+    "benchmark_max_drawdown": -0.038765419379179544,
+    "win_rate": 0.5161290322580645,
+    "mean_daily_return": -0.00012111420004430738,
+    "median_daily_return": 0.00016867938980156473,
+    "avg_holdings": 15.419354838709678,
+    "avg_gross_exposure": 0.4337516733776011,
+    "avg_regime_exposure": 0.9516129032258065,
+    "avg_turnover": 1.0483870967741935,
+    "max_daily_turnover": 8,
+    "zero_holding_days": 0,
+    "longest_zero_holding_streak": 0,
+    "no_candidate_days": 21,
+    "avg_daily_candidates": 2.7419354838709675,
+    "trade_count": 65,
+    "attribution_concentration": {
+        "total_positive_pnl": 48.74618353544524,
+        "top_1_pnl": 7.178235535273087,
+        "top_3_pnl": 18.51455669683839,
+        "top_5_pnl": 27.051869159332576,
+        "top_1_share_of_positive_pnl": 0.14725738539209976,
+        "top_3_share_of_positive_pnl": 0.379815512805751,
+        "top_5_share_of_positive_pnl": 0.5549535819488742
+    }
+}
+==================================================
+PURGED WALK-FORWARD BACKTEST (1d): cutoff = 6 months (single fit at cutoff)
+==================================================
+Loading all tickers...
+
+
+Latest available date: 2026-08-31
+Cutoff date: 2026-02-28
+Building full point-in-time universe...
+
+
+Walk-forward cutoff date: 2026-02-28
+Train rows: 1,611,547
+Walk-forward rows: 96,043
+Features: 92
+Training fold 1/1 as of 2026-02-28 for 125 prediction bars...
+
+
+Saved walk-forward results to: /home/god/Projects/market_predictor/model/1d Model [2026-09-01 20:11]/walk_forward/6
+Walk-forward summary:
+{
+    "interval": "1d",
+    "model_type": "ENSEMBLE",
+    "retraining": "single_fit_at_cutoff",
+    "retrain_every_n_bars": 0,
+    "model_fit_count": 1,
+    "feature_count": 92,
+    "target_column": "target_risk_adjusted_return",
+    "months_back": 6,
+    "cutoff_date": "2026-02-28",
+    "start_date": "2026-03-02",
+    "end_date": "2026-08-27",
+    "initial_capital": 1000.0,
+    "final_equity": 1123.1033634362238,
+    "profit_loss": 123.10336343622384,
+    "total_return": 0.12310336343622374,
+    "benchmark_total_return": 0.14272476864880823,
+    "active_total_return": -0.019621405212584486,
+    "cagr_like": 0.2637063604206702,
+    "sharpe_like": 2.7999698805519952,
+    "information_ratio_like": -0.37183251402889156,
+    "max_drawdown": -0.030619863635220845,
+    "benchmark_max_drawdown": -0.060689439693263125,
+    "win_rate": 0.568,
+    "mean_daily_return": 0.0009433715671833058,
+    "median_daily_return": 0.000537320020756595,
+    "avg_holdings": 22.56,
+    "avg_gross_exposure": 0.5438471821612114,
+    "avg_regime_exposure": 0.832,
+    "avg_turnover": 1.816,
+    "max_daily_turnover": 8,
+    "zero_holding_days": 0,
+    "longest_zero_holding_streak": 0,
+    "no_candidate_days": 3,
+    "avg_daily_candidates": 4.536,
+    "trade_count": 227,
+    "attribution_concentration": {
+        "total_positive_pnl": 219.36688413103207,
+        "top_1_pnl": 14.955308687582306,
+        "top_3_pnl": 40.860462113882264,
+        "top_5_pnl": 61.966774682566815,
+        "top_1_share_of_positive_pnl": 0.06817486945134897,
+        "top_3_share_of_positive_pnl": 0.18626540772432873,
+        "top_5_share_of_positive_pnl": 0.2824800786501251
+    }
+}
+==================================================
+PURGED WALK-FORWARD BACKTEST (1d): cutoff = 12 months (single fit at cutoff)
+==================================================
+Loading all tickers...
+
+
+Latest available date: 2026-08-31
+Cutoff date: 2025-08-31
+Building full point-in-time universe...
+
+
+Walk-forward cutoff date: 2025-08-31
+Train rows: 1,581,688
+Walk-forward rows: 190,489
+Features: 92
+Training fold 1/1 as of 2025-08-31 for 249 prediction bars...
+
+
+Saved walk-forward results to: /home/god/Projects/market_predictor/model/1d Model [2026-09-01 20:11]/walk_forward/12
+Walk-forward summary:
+{
+    "interval": "1d",
+    "model_type": "ENSEMBLE",
+    "retraining": "single_fit_at_cutoff",
+    "retrain_every_n_bars": 0,
+    "model_fit_count": 1,
+    "feature_count": 92,
+    "target_column": "target_risk_adjusted_return",
+    "months_back": 12,
+    "cutoff_date": "2025-08-31",
+    "start_date": "2025-09-02",
+    "end_date": "2026-08-27",
+    "initial_capital": 1000.0,
+    "final_equity": 1220.707029880091,
+    "profit_loss": 220.7070298800911,
+    "total_return": 0.22070702988009105,
+    "benchmark_total_return": 0.2072015782036707,
+    "active_total_return": 0.013505451676420366,
+    "cagr_like": 0.22364363931328035,
+    "sharpe_like": 2.652248869309588,
+    "information_ratio_like": 0.050753306357947024,
+    "max_drawdown": -0.026889259788228093,
+    "benchmark_max_drawdown": -0.08086224685707111,
+    "win_rate": 0.5502008032128514,
+    "mean_daily_return": 0.0008129947111511003,
+    "median_daily_return": 0.00048660323181300575,
+    "avg_holdings": 19.783132530120483,
+    "avg_gross_exposure": 0.53517833779776,
+    "avg_regime_exposure": 0.8815261044176707,
+    "avg_turnover": 2.5783132530120483,
+    "max_daily_turnover": 27,
+    "zero_holding_days": 7,
+    "longest_zero_holding_streak": 3,
+    "no_candidate_days": 25,
+    "avg_daily_candidates": 7.42570281124498,
+    "trade_count": 642,
+    "attribution_concentration": {
+        "total_positive_pnl": 333.69868079268724,
+        "top_1_pnl": 11.50504334038033,
+        "top_3_pnl": 32.09449781878433,
+        "top_5_pnl": 48.68122325287773,
+        "top_1_share_of_positive_pnl": 0.03447734139389039,
+        "top_3_share_of_positive_pnl": 0.09617807820679782,
+        "top_5_share_of_positive_pnl": 0.1458837749590065
+    }
+}

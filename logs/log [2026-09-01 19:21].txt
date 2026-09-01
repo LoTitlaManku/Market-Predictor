@@ -1,0 +1,68 @@
+==================================================
+PURGED WALK-FORWARD BACKTEST (1d): cutoff = 3 months (periodic expanding fit every 21 bars)
+==================================================
+Loading all tickers...
+
+
+Latest available date: 2026-08-31
+Cutoff date: 2026-05-31
+Building full point-in-time universe...
+
+
+Walk-forward cutoff date: 2026-05-31
+Train rows: 1,625,637
+Walk-forward rows: 48,077
+Features: 86
+Training fold 1/4 as of 2026-05-31 for 21 prediction bars...
+Training fold 2/4 as of 2026-06-30 for 21 prediction bars...
+Training fold 3/4 as of 2026-07-30 for 21 prediction bars...
+Training fold 4/4 as of 2026-08-28 for 1 prediction bars...
+
+
+Saved walk-forward results to: /home/god/Projects/market_predictor/model/1d Model [2026-09-01 19:21]/walk_forward/3
+Walk-forward summary:
+{
+    "interval": "1d",
+    "model_type": "ENSEMBLE",
+    "retraining": "periodic_expanding_every_21_bars",
+    "retrain_every_n_bars": 21,
+    "model_fit_count": 4,
+    "target_column": "target_risk_adjusted_return",
+    "months_back": 3,
+    "cutoff_date": "2026-05-31",
+    "start_date": "2026-06-01",
+    "end_date": "2026-08-27",
+    "initial_capital": 1000.0,
+    "final_equity": 948.5135647700611,
+    "profit_loss": -51.486435229938934,
+    "total_return": -0.0514864352299389,
+    "benchmark_total_return": 0.016217044426050986,
+    "active_total_return": -0.06770347965598988,
+    "cagr_like": -0.19333516883140756,
+    "sharpe_like": -2.8218426445165394,
+    "information_ratio_like": -2.026140564853736,
+    "max_drawdown": -0.0528234838203393,
+    "benchmark_max_drawdown": -0.038765419379179544,
+    "win_rate": 0.45161290322580644,
+    "mean_daily_return": -0.0008411501029664396,
+    "median_daily_return": -0.0004365520302585937,
+    "avg_holdings": 16.016129032258064,
+    "avg_gross_exposure": 0.5129958351465059,
+    "avg_regime_exposure": 0.9516129032258065,
+    "avg_turnover": 0.967741935483871,
+    "max_daily_turnover": 8,
+    "zero_holding_days": 0,
+    "longest_zero_holding_streak": 0,
+    "no_candidate_days": 14,
+    "avg_daily_candidates": 6.564516129032258,
+    "trade_count": 60,
+    "attribution_concentration": {
+        "total_positive_pnl": 20.031334991516776,
+        "top_1_pnl": 4.436767816231607,
+        "top_3_pnl": 11.12346481580671,
+        "top_5_pnl": 16.31541362261239,
+        "top_1_share_of_positive_pnl": 0.22149136930267346,
+        "top_3_share_of_positive_pnl": 0.5553032197063986,
+        "top_5_share_of_positive_pnl": 0.8144945721052506
+    }
+}
