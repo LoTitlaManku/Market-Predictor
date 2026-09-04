@@ -46,9 +46,6 @@ class UniverseConfig:
     min_price: float = 5.0
     max_price: float = 5000.0
 
-    # The old static share-ADV snapshot leaked today's universe into historical
-    # tests and biased the universe toward cheap, speculative names.  The causal
-    # lagged dollar-volume filter below is the source of truth instead.
     min_profile_adv: float | None = None
 
     target_column: str = "target_risk_adjusted_return"
@@ -56,8 +53,6 @@ class UniverseConfig:
     max_training_years: int = 10
     recency_half_life_days: float = 1095.0
 
-    # Periodic fitting is available for robustness experiments, but remains
-    # opt-in because the current held-out comparison favours the anchored fit.
     retrain_every_n_bars_1d: int = 0
     retrain_every_n_bars_1h: int = 0
     max_loaded_model_age_days_1d: int = 45
@@ -182,10 +177,7 @@ class DataManager:
 
         return df
 
-    def add_forward_excess_target(
-            self, df: pd.DataFrame, benchmark_close: pd.Series, interval: str,
-            drop_unlabelled: bool = True
-    ) -> pd.DataFrame:
+    def add_forward_excess_target(self, df: pd.DataFrame, benchmark_close: pd.Series, drop_unlabelled: bool = True) -> pd.DataFrame:
         df = df.copy()
         beta = df["rolling_beta"]
         close = df["Adj Close"]
@@ -193,9 +185,6 @@ class DataManager:
 
         df["future_return"] = close.shift(-self.config.horizon) / close - 1.0
         df["benchmark_future_return"] = (benchmark_close.shift(-self.config.horizon) / benchmark_close - 1.0)
-        # The source row's label is not observable until this date.  Rolling
-        # retraining filters on it so the horizon can never cross a model's
-        # as-of date (the usual purged walk-forward requirement).
         df["target_end_date"] = pd.Series(df.index, index=df.index).shift(-self.config.horizon)
 
         if isinstance(beta, pd.Series):
@@ -247,9 +236,7 @@ class DataManager:
         if not data_dict: raise ValueError("No raw universe data loaded.")
         return data_dict
 
-    def validate_comparative_freshness(
-            self, interval: str, latest_stock_date: pd.Timestamp
-    ):
+    def validate_comparative_freshness(self, interval: str, latest_stock_date: pd.Timestamp):
         max_staleness = (
             self.config.comparative_max_staleness_days_1h if interval == "1h"
             else self.config.comparative_max_staleness_days_1d
@@ -275,9 +262,6 @@ class DataManager:
         self.validate_comparative_freshness(interval, latest_stock_date)
 
         benchmark_raw = load_comparative_data("SPY", interval)
-        benchmark_raw.index.name = "Date"
-        benchmark_raw.index = pd.to_datetime(benchmark_raw.index, utc=True).tz_localize(None)
-        benchmark_raw = benchmark_raw[~benchmark_raw.index.duplicated(keep="first")].sort_index()
         benchmark_close = benchmark_raw["Adj Close"]
 
         log("")
@@ -320,14 +304,9 @@ class DataManager:
         data = data.sort_values(["Date", "ticker"])
         data = data.replace([np.inf, -np.inf], np.nan)
 
-        # Point-in-time cross-sectional regime context.  These use only values
-        # observable at the signal close and are shared by every ticker that day.
         by_date = data.groupby("Date")
-        data["Market_Breadth_Above_200"] = by_date["PDMA_200"].transform(
-            lambda values: float((values > 0).mean())
-        )
-        data["Market_Breadth_Above_50"] = by_date["PDMA_50"].transform(
-            lambda values: float((values > 0).mean())
+        data["Market_Breadth_Above_200"] = by_date["PDMA_200"].transform(lambda values: float((values > 0).mean()))
+        data["Market_Breadth_Above_50"] = by_date["PDMA_50"].transform(lambda values: float((values > 0).mean())
         )
         data["Market_Median_Momentum_1m"] = by_date["mom_1m"].transform("median")
         data["Market_Return_Dispersion"] = by_date["return_lag_1"].transform("std")
@@ -371,7 +350,6 @@ class DataManager:
         return df
 
     def add_portfolio_weights(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Assign fixed-slot, risk-scaled weights without filling unused cash."""
         required = {"Date", "rolling_vol", "Regime_Exposure"}
         missing = required - set(df.columns)
         if missing:
@@ -401,9 +379,7 @@ class Trainer:
         self.retraining_records: list[dict[str, Any]] = []
 
     @staticmethod
-    def calculate_gross_return(
-            position_returns: list[float], position_weights: list[float]
-    ) -> float:
+    def calculate_gross_return(position_returns: list[float], position_weights: list[float]) -> float:
         if len(position_returns) != len(position_weights):
             raise ValueError("Position returns and weights must have the same length")
         if not position_returns:
@@ -511,8 +487,6 @@ class Trainer:
             g.loc[valid, "exec_entry_price_mid"] = raw_open[entry_idx[valid]]
             g.loc[valid, "exec_exit_price_mid"] = raw_open[exit_idx[valid]]
 
-            # Mark multi-day holdings at consecutive mid opens.  Trading costs
-            # are charged only when a position leg changes in the simulator.
             g["long_entry_price"] = g["exec_entry_price_mid"]
             g["long_exit_price"] = g["exec_exit_price_mid"]
             g["long_exec_return"] = g["long_exit_price"] / g["long_entry_price"] - 1.0
@@ -531,7 +505,6 @@ class Trainer:
 
     @staticmethod
     def add_benchmark_performance(daily_df: pd.DataFrame, interval: str) -> pd.DataFrame:
-        """Attach SPY returns using the same next-open-to-following-open clock."""
         benchmark = load_comparative_data("SPY", interval).copy()
         benchmark.index = pd.to_datetime(benchmark.index, utc=True).tz_localize(None)
         benchmark = benchmark[~benchmark.index.duplicated(keep="last")].sort_index()
@@ -626,10 +599,7 @@ class Trainer:
         )
 
     @staticmethod
-    def trim_unexecutable_tail(
-            walk_df: pd.DataFrame, required_future_bars: int = 2
-    ) -> pd.DataFrame:
-        """Drop signal dates that cannot have a complete next-open return."""
+    def trim_unexecutable_tail(walk_df: pd.DataFrame, required_future_bars: int = 2) -> pd.DataFrame:
         dates = list(sorted(pd.to_datetime(walk_df["Date"]).unique()))
         if len(dates) <= required_future_bars:
             raise ValueError("Walk-forward window has no executable signal dates")
@@ -637,15 +607,7 @@ class Trainer:
         return walk_df[walk_df["Date"].isin(executable_dates)].copy()
 
     @staticmethod
-    def make_retraining_folds(
-            evaluation_dates: list[pd.Timestamp], cutoff_date: pd.Timestamp,
-            retrain_every_n_bars: int,
-    ) -> list[dict[str, Any]]:
-        """Return strictly out-of-sample prediction folds.
-
-        A refit made after one completed signal close is first used on the next
-        signal date.  Non-positive cadence preserves the anchored one-fit mode.
-        """
+    def make_retraining_folds(evaluation_dates: list[pd.Timestamp], cutoff_date: pd.Timestamp, retrain_every_n_bars: int) -> list[dict[str, Any]]:
         dates = [pd.Timestamp(date) for date in sorted(pd.to_datetime(evaluation_dates).unique())]
         if not dates:
             return []
@@ -662,9 +624,7 @@ class Trainer:
             })
         return folds
 
-    def predict_with_retraining(
-            self, walk_df: pd.DataFrame, cutoff_date: pd.Timestamp
-    ) -> pd.DataFrame:
+    def predict_with_retraining(self, walk_df: pd.DataFrame, cutoff_date: pd.Timestamp) -> pd.DataFrame:
         if self.prepared_data is None:
             raise ValueError("Prepared feature data is not available")
 
@@ -769,9 +729,7 @@ class Trainer:
         log(f"Saved walk-forward results to: {folder}")
         return folder
 
-    def run_training(
-            self, months_back: int | float, retrain_every_n_bars: int | None = None
-    ) -> dict[str, Any]:
+    def run_training(self, months_back: int | float, retrain_every_n_bars: int | None = None) -> dict[str, Any]:
         if retrain_every_n_bars is not None:
             if self.interval == "1h":
                 self.config.retrain_every_n_bars_1h = int(retrain_every_n_bars)
@@ -1171,10 +1129,7 @@ class Predictor:
         self.as_of_date = None
         self.model_folder: Path | None = None
 
-    def make_sample_weights(
-            self, dates: pd.Series, reference_date: pd.Timestamp
-    ) -> np.ndarray:
-        """Equalise each market date, then exponentially favour recent history."""
+    def make_sample_weights(self, dates: pd.Series, reference_date: pd.Timestamp) -> np.ndarray:
         dates = pd.to_datetime(dates)
         reference_date = pd.Timestamp(reference_date)
         if self.config.recency_half_life_days <= 0:
@@ -1189,9 +1144,7 @@ class Predictor:
             raise ValueError("Could not construct finite training sample weights")
         return (weights / mean_weight).to_numpy(dtype=np.float32)
 
-    def set_training_frame(
-            self, train_df: pd.DataFrame, reference_date: pd.Timestamp
-    ) -> None:
+    def set_training_frame(self, train_df: pd.DataFrame, reference_date: pd.Timestamp):
         target_col = self.config.target_column
         if target_col not in train_df.columns:
             raise ValueError(f"Configured target column is missing: {target_col}")
@@ -1435,17 +1388,8 @@ class Predictor:
     def predict_latest(
             self, data_dict: dict, models: dict, pred_data: pd.DataFrame | None = None,
             *, prediction_dir: str | Path | None = None,
-            update_legacy_paper_ledger: bool = True,
-            return_details: bool = False,
+            update_legacy_paper_ledger: bool = True, return_details: bool = False,
     ) -> pd.DataFrame | dict[str, Any]:
-        """Score the latest completed feature date.
-
-        ``testing_things.run_daily_paper_trading`` supplies a session-local
-        prediction directory and owns its stateful portfolio transition.  The
-        legacy ledger remains the default for older callers, but can be
-        disabled so a new paper session cannot be contaminated by the old
-        global holdings file.
-        """
         if pred_data is None:
             log("Building latest prediction universe...")
             pred_data = self.datamanager.build_universe(self.interval, data_dict, drop_unlabelled=False)
@@ -1746,29 +1690,14 @@ class Predictor:
 ########################################################################################################################
 
 if __name__ == "__main__":
-    import argparse
-
-    parser = argparse.ArgumentParser(description="Run purged stock-model walk-forward tests")
-    parser.add_argument("--months", nargs="+", type=int, default=[3,6,12])
-    parser.add_argument(
-        "--retrain-bars", type=int, default=None,
-        help="Optional refit cadence in signal bars; omit for one anchored fit",
-    )
-    parser.add_argument(
-        "--anchored", action="store_true",
-        help="Use one model fitted at the initial cutoff (quick diagnostic)",
-    )
-    args = parser.parse_args()
-
     start = time.perf_counter()
 
-    # print("Training...")
-    # mng = Predictor("1d")
-    # mng.run_pipeline()
-
     trainer = Trainer("1d")
-    cadence = 0 if args.anchored else args.retrain_bars
-    for mon in args.months:
+    anchored = True # Use one model fitted at the initial cutoff (quick diagnostic)
+    retrain_bars = None # Refit cadence in signal bars; omit for one anchored fit
+    cadence = 0 if anchored else retrain_bars
+
+    for mon in [3,6,12]:
         trainer.run_training(months_back=mon, retrain_every_n_bars=cadence)
 
     print(f"Total time: {time.perf_counter() - start:.1f}s")

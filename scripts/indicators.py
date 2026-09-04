@@ -367,14 +367,7 @@ class TechnicalAnalysisAccessor:
             vix_close.rolling(percentile_window, min_periods=min_periods).rank(pct=True)
         )
 
-        df = pd.merge_asof(
-            df,
-            vix_features,
-            left_index=True,
-            right_index=True,
-            direction='backward'
-        )
-
+        df = pd.merge_asof(df, vix_features, left_index=True, right_index=True, direction='backward')
         return df
 
     @staticmethod

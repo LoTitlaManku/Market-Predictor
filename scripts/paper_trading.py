@@ -1,9 +1,3 @@
-"""Stateful daily paper trading on the walk-forward execution clock.
-
-The public entry point lives in :mod:`scripts.testing_things`.  This module
-contains the state machine and accounting helpers so they can be tested
-without downloading data or fitting the production models.
-"""
 
 from __future__ import annotations
 
@@ -19,12 +13,7 @@ import pandas as pd
 from scripts.config import MODEL_DIR
 from scripts.data_management import NYSE_CAL, UpdateWorker, load_comparative_data
 from scripts.predictor import (
-    MODEL_PIPELINE_VERSION,
-    Predictor,
-    Trainer,
-    UniverseConfig,
-    flush_memory,
-    json_safe,
+    MODEL_PIPELINE_VERSION, Predictor, Trainer, UniverseConfig, flush_memory, json_safe,
 )
 
 ORDER_COLUMNS = [
@@ -54,6 +43,7 @@ DAILY_COLUMNS = [
     "exec_entry_date", "exec_exit_date", "missing_position_returns",
 ]
 
+########################################################################################################################
 
 def _atomic_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -61,20 +51,17 @@ def _atomic_json(path: Path, payload: dict[str, Any]) -> None:
     temporary.write_text(json.dumps(json_safe(payload), indent=2), encoding="utf-8")
     temporary.replace(path)
 
-
 def _atomic_csv(path: Path, frame: pd.DataFrame) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.tmp")
     frame.to_csv(temporary, index=False)
     temporary.replace(path)
 
-
 def _read_csv(path: Path, columns: list[str] | None = None) -> pd.DataFrame:
     try:
         return pd.read_csv(path)
     except pd.errors.EmptyDataError:
         return pd.DataFrame(columns=columns)
-
 
 def _as_utc(now: pd.Timestamp | str | None) -> pd.Timestamp:
     if now is None:
@@ -84,11 +71,9 @@ def _as_utc(now: pd.Timestamp | str | None) -> pd.Timestamp:
         value = value.tz_localize("Europe/London")
     return value.tz_convert("UTC")
 
+########################################################################################################################
 
-def latest_completed_nyse_session(
-        now: pd.Timestamp | str | None = None, vendor_grace_minutes: int = 15,
-) -> pd.Timestamp:
-    """Return the last daily session whose close plus vendor grace has passed."""
+def latest_completed_nyse_session(now: pd.Timestamp | str | None = None, vendor_grace_minutes: int = 15) -> pd.Timestamp:
     now_utc = _as_utc(now)
     schedule = NYSE_CAL.schedule(
         start_date=(now_utc - pd.Timedelta(days=14)).date(),
@@ -96,13 +81,10 @@ def latest_completed_nyse_session(
     )
     if schedule.empty:
         raise RuntimeError("Could not resolve an NYSE trading session")
-    completed = schedule[
-        schedule["market_close"] + pd.Timedelta(minutes=vendor_grace_minutes) <= now_utc
-    ]
+    completed = schedule[schedule["market_close"] + pd.Timedelta(minutes=vendor_grace_minutes) <= now_utc]
     if completed.empty:
         raise RuntimeError("No completed NYSE session is available yet")
     return pd.Timestamp(completed.index[-1]).tz_localize(None).normalize()
-
 
 def _next_market_open(signal_date: pd.Timestamp) -> pd.Timestamp:
     schedule = NYSE_CAL.schedule(
@@ -113,16 +95,13 @@ def _next_market_open(signal_date: pd.Timestamp) -> pd.Timestamp:
         raise RuntimeError(f"Could not resolve the next market open after {signal_date:%Y-%m-%d}")
     return pd.Timestamp(schedule.iloc[0]["market_open"]).tz_convert("Europe/London")
 
-
 def _session_days(session_dir: Path) -> list[Path]:
     days_root = session_dir / "days"
-    if not days_root.exists():
-        return []
+    if not days_root.exists(): return []
     return sorted(
         path for path in days_root.iterdir()
         if path.is_dir() and (path / "manifest.json").exists()
     )
-
 
 def _latest_day_manifest(session_dir: Path) -> tuple[Path | None, dict[str, Any] | None]:
     days = _session_days(session_dir)
@@ -131,10 +110,8 @@ def _latest_day_manifest(session_dir: Path) -> tuple[Path | None, dict[str, Any]
     path = days[-1]
     return path, json.loads((path / "manifest.json").read_text(encoding="utf-8"))
 
-
 def _session_config(
-        session_dir: Path, *, session_name: str, interval: str,
-        initial_capital: float, retrain_every_n_bars: int,
+        session_dir: Path, *, session_name: str, interval: str, initial_capital: float, retrain_every_n_bars: int,
 ) -> dict[str, Any]:
     config_path = session_dir / "config.json"
     strategy_config = UniverseConfig()
@@ -168,8 +145,7 @@ def _session_config(
 
 
 def _truncate_and_validate_data(
-        data_dict: dict[str, pd.DataFrame], cutoff: pd.Timestamp,
-        *, strict: bool, minimum_coverage: float = 0.80,
+        data_dict: dict[str, pd.DataFrame], cutoff: pd.Timestamp, *, strict: bool, minimum_coverage: float = 0.80,
 ) -> tuple[dict[str, pd.DataFrame], dict[str, Any]]:
     truncated: dict[str, pd.DataFrame] = {}
     latest_by_ticker: dict[str, pd.Timestamp] = {}
@@ -217,7 +193,6 @@ def _truncate_and_validate_data(
         )
     return truncated, report
 
-
 def _read_prior_holdings(session_dir: Path) -> pd.DataFrame:
     day_path, _ = _latest_day_manifest(session_dir)
     if day_path is None:
@@ -225,6 +200,7 @@ def _read_prior_holdings(session_dir: Path) -> pd.DataFrame:
     path = day_path / "holdings_state.csv"
     return pd.read_csv(path) if path.exists() else pd.DataFrame(columns=HOLDING_COLUMNS)
 
+########################################################################################################################
 
 def transition_portfolio(
         latest: pd.DataFrame, prior_holdings: pd.DataFrame,
