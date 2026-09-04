@@ -505,72 +505,94 @@ def plot_performance_metrics(csv_path: str, show: bool = True, save_path=None):
         plt.show()
     return fig
 
+
+def run_daily_paper_trading(
+        session_name: str = "paper_1d", initial_capital: float = 1000.0, *,
+        update_data: bool = True, update_sentiment: bool = True,
+        model_mode: str = "auto", retrain_every_n_bars: int | None = None,
+        vendor_grace_minutes: int = 15, strict_data: bool = True,
+        now=None, verbose: bool = True,
+):
+    """Run one idempotent daily paper-trading cycle.
+
+    Run it before the NYSE opens or at least ``vendor_grace_minutes`` after it
+    closes.  Signals execute at the next open, and their P&L is saved only when
+    the following open is available, exactly like the walk-forward simulator.
+
+    ``model_mode='auto'`` reuses a compatible model and trains when required.
+    A zero retraining cadence keeps the tested anchored-model behaviour, with
+    the predictor's stale-model safety limit still enforced.
+    """
+    from scripts.paper_trading import run_daily_paper_session
+
+    return run_daily_paper_session(
+        session_name=session_name,
+        initial_capital=initial_capital,
+        update_data=update_data,
+        update_sentiment=update_sentiment,
+        model_mode=model_mode,
+        retrain_every_n_bars=retrain_every_n_bars,
+        vendor_grace_minutes=vendor_grace_minutes,
+        strict_data=strict_data,
+        now=now,
+        verbose=verbose,
+    )
+
 ########################################################################################################################
 
 if __name__ == "__main__":
-    import time
-    start = time.perf_counter()
+    import argparse
 
-    # import argparse
-    # parser = argparse.ArgumentParser(description="Inspect a completed walk-forward run")
-    # parser.add_argument("--interval", default="1d")
-    # parser.add_argument("--months", type=int, default=12)
-    # parser.add_argument("--folder", default=None)
-    # parser.add_argument("--save", default=None, help="Optional image output path")
-    # parser.add_argument("--no-show", action="store_true")
-    # parser.add_argument("--include-experiments", action="store_true")
-    # args = parser.parse_args()
+    parser = argparse.ArgumentParser(description="Paper trading and walk-forward reporting tools")
+    commands = parser.add_subparsers(dest="command", required=True)
 
-    # import time_machine
-    # from datetime import datetime, timezone
-    # target_time = datetime(2026, 6, 10, 15, 0, 0, tzinfo=timezone.utc)
-    # with time_machine.travel(target_time):
-    #     f()
-
-    # updates(  # Whether to update:
-    #     sent=True,  # News sentiment
-    #     spy=True,  # Market sentiment indicators
-    #     cache=True,  # Stock cache
-    # )
-    # find_latest()
-
-    # from predictor import Predictor
-    # print("Training...")
-    # mng = Predictor("1d")
-    # mng.run_pipeline("latest")
-
-    # from folder_trees import generate_tree
-    # generate_tree("/home/god/Projects/market_predictor", ignore_paths=[".bin", ".venv", "cache_files", "imgs"])
-
-    # result_folder = args.folder or find_latest_walk_forward(
-    #     args.interval, args.months, include_experiments=args.include_experiments
-    # )
-    # report = summarise_walk_forward(result_folder)
-    # print(f"Result: {report['folder']}")
-    # print(report["monthly"].to_string(index=False))
-    # if not report["zero_holding_runs"].empty:
-    #     print("\nZero-holding runs:")
-    #     print(report["zero_holding_runs"].to_string(index=False))
-    # if report["exit_reasons"]:
-    #     print(f"\nExit reasons: {report['exit_reasons']}")
-    # if not report["signals"].empty:
-    #     print("\nLatest signal funnel:")
-    #     print(report["signals"].tail(10).to_string(index=False))
-
-    # plot_performance_metrics(
-    #     str(report["folder"] / "daily_equity.csv"),
-    #     show=not args.no_show,
-    #     save_path=args.save,
-    # )
-
-    plot_performance_metrics(
-        "/home/god/Projects/market_predictor/model/1d Model [2026-09-01 20:11]/walk_forward/12/daily_equity.csv",
-        show=True,
+    paper = commands.add_parser("paper", help="Run one daily paper-trading cycle")
+    paper.add_argument("--session", default="paper_1d")
+    paper.add_argument("--initial-capital", type=float, default=1000.0)
+    paper.add_argument("--model-mode", choices=["auto", "always", "never"], default="auto")
+    paper.add_argument(
+        "--retrain-bars", type=int, default=None,
+        help="Optional fixed refit cadence; an existing session remembers its original value",
     )
+    paper.add_argument("--grace-minutes", type=int, default=15)
+    paper.add_argument(
+        "--as-of", default=None,
+        help="Optional ISO timestamp for deliberately backfilling a missed signal day",
+    )
+    paper.add_argument("--no-update", action="store_true")
+    paper.add_argument("--no-sentiment", action="store_true")
+    paper.add_argument("--allow-partial-data", action="store_true")
 
-    print(time.perf_counter() - start)
-    pass
+    report_parser = commands.add_parser("report", help="Inspect a completed walk-forward run")
+    report_parser.add_argument("--interval", default="1d")
+    report_parser.add_argument("--months", type=int, default=12)
+    report_parser.add_argument("--folder", default=None)
+    report_parser.add_argument("--save", default=None)
+    report_parser.add_argument("--no-show", action="store_true")
+    report_parser.add_argument("--include-experiments", action="store_true")
 
-
-    # import folder_trees
-    # folder_trees.generate_tree("C:/Users/adlan_3zfnjq7/Desktop/Alex - Main/Projects/LoTi-Log", ignore_paths=[".briefcase"])
+    args = parser.parse_args()
+    if args.command == "paper":
+        run_daily_paper_trading(
+            session_name=args.session,
+            initial_capital=args.initial_capital,
+            update_data=not args.no_update,
+            update_sentiment=not args.no_sentiment,
+            model_mode=args.model_mode,
+            retrain_every_n_bars=args.retrain_bars,
+            vendor_grace_minutes=args.grace_minutes,
+            strict_data=not args.allow_partial_data,
+            now=args.as_of,
+        )
+    else:
+        result_folder = args.folder or find_latest_walk_forward(
+            args.interval, args.months, include_experiments=args.include_experiments
+        )
+        report = summarise_walk_forward(result_folder)
+        print(f"Result: {report['folder']}")
+        print(report["monthly"].to_string(index=False))
+        plot_performance_metrics(
+            str(report["folder"] / "daily_equity.csv"),
+            show=not args.no_show,
+            save_path=args.save,
+        )

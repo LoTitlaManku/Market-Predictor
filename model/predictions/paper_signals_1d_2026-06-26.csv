@@ -1,1 +1,0 @@
-signal_date,ticker,paper_action,target_weight,pred,pred_cat,pred_lgbm,ensemble_score,cat_rank_pct,lgbm_rank_pct

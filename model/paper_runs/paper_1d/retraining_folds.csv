@@ -1,0 +1,2 @@
+fold,model_as_of_date,prediction_start,prediction_end,prediction_bars,training_rows,latest_training_feature_date,latest_label_end_date,model_name,reason
+0,2026-09-02T00:00:00,2026-09-02T00:00:00,2026-09-02T00:00:00,1,1639700,2026-07-08T00:00:00,2026-09-02T00:00:00,2026-09-02 21:52,trained_initial

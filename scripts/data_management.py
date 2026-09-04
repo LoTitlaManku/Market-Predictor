@@ -170,7 +170,7 @@ class UpdateWorker:
         shared._ERRORS = {}
         print(f"Downloading 1d data...")
         batch_data = yf.download(
-            ticker_list, start=start_date, interval="1d", group_by='ticker', auto_adjust=False, progress=True
+            ticker_list, start=start_date, interval="1d", group_by='ticker', auto_adjust=False, progress=False
         )
         if batch_data is None or batch_data.empty: return
 
@@ -180,7 +180,7 @@ class UpdateWorker:
             print(f"\nRetrying failed tickers: {failed_tickers}")
             shared._ERRORS = {}
             extra_data = yf.download(
-                failed_tickers, start=start_date, interval="1d", group_by='ticker', auto_adjust=False, progress=True
+                failed_tickers, start=start_date, interval="1d", group_by='ticker', auto_adjust=False, progress=False
             )
 
             if extra_data is not None and not extra_data.empty:

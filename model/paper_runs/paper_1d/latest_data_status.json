@@ -1,0 +1,13 @@
+{
+  "cutoff_date": "2026-09-03T00:00:00",
+  "latest_stock_date": "2026-09-03T00:00:00",
+  "loaded_tickers": 954,
+  "recently_active_tickers": 944,
+  "tickers_at_cutoff": 938,
+  "cutoff_coverage": 0.9936440677966102,
+  "minimum_required_coverage": 0.8,
+  "update_requested": true,
+  "update_sentiment_requested": true,
+  "update_errors": [],
+  "completed_session": "2026-09-03T00:00:00"
+}

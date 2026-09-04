@@ -1169,6 +1169,7 @@ class Predictor:
         self.y_test = None
         self.sample_weight = None
         self.as_of_date = None
+        self.model_folder: Path | None = None
 
     def make_sample_weights(
             self, dates: pd.Series, reference_date: pd.Timestamp
@@ -1296,7 +1297,7 @@ class Predictor:
         model.fit(self.X_train, self.y_train, sample_weight=self.sample_weight)
         return model
 
-    def save_models(self, results: dict):
+    def save_models(self, results: dict) -> Path:
         local_now = pd.Timestamp.now().strftime('%Y-%m-%d %H:%M')
         model_folder = Path(MODEL_DIR) / "models" / f"{local_now}"
         predictions_folder = Path(MODEL_DIR) / "predictions"
@@ -1329,6 +1330,8 @@ class Predictor:
 
         metadata_path = model_folder / "metadata.json"
         metadata_path.write_text(json.dumps(json_safe(metadata), indent=4), encoding="utf-8")
+        self.model_folder = model_folder
+        return model_folder
 
     def load_models(self, load_model: str = "latest") -> dict:
         models_root = Path(MODEL_DIR) / "models"
@@ -1353,6 +1356,11 @@ class Predictor:
                     f"Model {model_folder.name} uses pipeline version {pipeline_version!r}; "
                     f"version {MODEL_PIPELINE_VERSION} is required. Retrain before paper prediction."
                 )
+            if metadata.get("interval") != self.interval:
+                raise ValueError(
+                    f"Model {model_folder.name} uses interval {metadata.get('interval')!r}; "
+                    f"{self.interval!r} is required."
+                )
             self.split_date = pd.Timestamp(metadata.get("end_date"))
             self.as_of_date = pd.Timestamp(metadata.get("as_of_date"))
         else:
@@ -1365,6 +1373,7 @@ class Predictor:
             "LGBM": joblib.load(model_folder / "lgbm_model.joblib"),
             "CAT": joblib.load(model_folder / "cat_model.joblib"),
         }
+        self.model_folder = model_folder
         return models
 
     def add_ensemble_predictions(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -1424,8 +1433,19 @@ class Predictor:
         return df
 
     def predict_latest(
-            self, data_dict: dict, models: dict, pred_data: pd.DataFrame | None = None
-    ) -> pd.DataFrame:
+            self, data_dict: dict, models: dict, pred_data: pd.DataFrame | None = None,
+            *, prediction_dir: str | Path | None = None,
+            update_legacy_paper_ledger: bool = True,
+            return_details: bool = False,
+    ) -> pd.DataFrame | dict[str, Any]:
+        """Score the latest completed feature date.
+
+        ``testing_things.run_daily_paper_trading`` supplies a session-local
+        prediction directory and owns its stateful portfolio transition.  The
+        legacy ledger remains the default for older callers, but can be
+        disabled so a new paper session cannot be contaminated by the old
+        global holdings file.
+        """
         if pred_data is None:
             log("Building latest prediction universe...")
             pred_data = self.datamanager.build_universe(self.interval, data_dict, drop_unlabelled=False)
@@ -1451,6 +1471,8 @@ class Predictor:
 
         latest["pred_lgbm"] = models["LGBM"].predict(X_latest)
         latest["pred_cat"] = models["CAT"].predict(X_latest)
+        latest["model_as_of_date"] = self.as_of_date
+        latest["model_name"] = self.model_folder.name if self.model_folder is not None else None
 
         latest = self.add_ensemble_predictions(latest)
         latest = self.datamanager.add_portfolio_weights(latest)
@@ -1475,7 +1497,9 @@ class Predictor:
         ]
         picks = picks[[c for c in cols if c in picks.columns]]
 
-        pred_dir = Path(MODEL_DIR) / "predictions"
+        pred_dir = Path(prediction_dir) if prediction_dir is not None \
+            else Path(MODEL_DIR) / "predictions"
+        pred_dir.mkdir(parents=True, exist_ok=True)
         date_str = pd.Timestamp(latest_date).strftime("%Y-%m-%d")
 
         latest.to_parquet(pred_dir / f"all_predictions_{self.interval}_{date_str}.parquet", index=False)
@@ -1510,7 +1534,16 @@ class Predictor:
         picks.to_csv(pred_dir / f"paper_signals_{self.interval}_{date_str}.csv", index=False)
         picks.to_csv(pred_dir / "latest_paper_signals.csv", index=False)
 
-        self.update_paper_ledger(latest, picks)
+        if update_legacy_paper_ledger:
+            self.update_paper_ledger(latest, picks)
+
+        if return_details:
+            return {
+                "latest": latest,
+                "picks": picks,
+                "diagnostics": diagnostics,
+                "prediction_dir": pred_dir,
+            }
         return picks
 
     def update_paper_ledger(self, latest: pd.DataFrame, picks: pd.DataFrame) -> None:
