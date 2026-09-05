@@ -200,7 +200,7 @@ class UpdateWorker:
             updated_df = updated_df[~updated_df.index.duplicated(keep='last')]
             updated_df = updated_df.loc[:, ~updated_df.columns.duplicated()]
             updated_df = updated_df.sort_index()
-            updated_df.to_csv(cache_file)
+            updated_df.to_csv(os.path.join(DATA_DIR, f"{comparative.replace("^", "")}_1h.csv"))
 
     @staticmethod
     def sentiment_update():
