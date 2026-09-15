@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 
 from scripts import data_management
+from scripts.indicators import TechnicalAnalysisAccessor
 from scripts.predictor import DataManager, Predictor, Trainer, UniverseConfig
 from scripts.testing_things import find_latest_walk_forward, summarise_walk_forward
 
@@ -55,6 +56,49 @@ class ComparativeDataTests(unittest.TestCase):
         with patch("scripts.predictor.load_comparative_data", side_effect=comparative):
             with self.assertRaisesRegex(ValueError, "Stale VIX_1d data"):
                 manager.validate_comparative_freshness("1d", pd.Timestamp("2026-08-31"))
+
+    def test_macro_merge_normalises_microsecond_and_nanosecond_indices(self):
+        stock = pd.DataFrame(
+            {"feature": [1.0, 2.0]},
+            index=pd.DatetimeIndex(
+                np.array(["2026-09-03", "2026-09-04"], dtype="datetime64[ns]")
+            ),
+        )
+        treasury = pd.DataFrame(
+            {"Adj Close": [4.1, 4.2]},
+            index=pd.DatetimeIndex(
+                np.array(["2026-09-03", "2026-09-04"], dtype="datetime64[us]")
+            ),
+        )
+
+        with patch("scripts.indicators.load_comparative_data", return_value=treasury):
+            result = TechnicalAnalysisAccessor._add_macro_context(stock, "1d")
+
+        self.assertEqual(str(result.index.dtype), "datetime64[ns]")
+        self.assertEqual(result["Treasury_30Y"].tolist(), [4.1, 4.2])
+
+    def test_daily_comparative_update_writes_daily_stores(self):
+        existing = pd.DataFrame(
+            {"Adj Close": [100.0]}, index=pd.to_datetime(["2026-09-03"])
+        )
+        downloaded = pd.DataFrame(
+            {"Adj Close": [101.0]}, index=pd.to_datetime(["2026-09-04"])
+        )
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with (
+                patch.object(data_management, "DATA_DIR", str(root)),
+                patch.object(data_management, "load_comparative_data", return_value=existing),
+                patch.object(data_management.yf, "download", return_value=downloaded),
+                patch.object(data_management, "get_day_close", return_value=None),
+            ):
+                data_management.UpdateWorker.update_comparatives()
+
+            for name in ("VIX", "VVIX", "TYX", "SPY"):
+                self.assertTrue((root / f"{name}_1d.csv").exists())
+                self.assertTrue((root / f"{name}_1d.parquet").exists())
+                self.assertFalse((root / f"{name}_1h.csv").exists())
 
 
 class PredictionLogicTests(unittest.TestCase):

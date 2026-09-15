@@ -1,0 +1,16 @@
+{
+    "Date": "2026-09-09T00:00:00",
+    "model_as_of_date": "2026-09-02T00:00:00",
+    "universe_rows": 752,
+    "pred_cat_positive": 652,
+    "pred_lgbm_positive": 426,
+    "both_models_positive": 416,
+    "positive_agreement": 14,
+    "risk_eligible": 576,
+    "agreement_and_risk_eligible": 21,
+    "quantile_long_signals": 16,
+    "final_candidates": 11,
+    "regime_exposure": 1.0,
+    "median_pred_raw": 0.08428344492195138,
+    "max_pred_raw": 0.429362526709704
+}

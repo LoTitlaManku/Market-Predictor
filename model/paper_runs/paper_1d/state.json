@@ -1,10 +1,10 @@
 {
   "session_name": "paper_1d",
-  "latest_signal_date": "2026-09-03T00:00:00",
-  "performance_through_signal_date": null,
+  "latest_signal_date": "2026-09-10T00:00:00",
+  "performance_through_signal_date": "2026-09-10T00:00:00",
   "current_model": "2026-09-02 21:52",
-  "current_holdings": 14,
-  "settled_equity": 1000.0,
-  "pending_days": 2,
-  "updated_at": "2026-09-04T20:25:18.214785+00:00"
+  "current_holdings": 28,
+  "settled_equity": 979.0970776702563,
+  "pending_days": 0,
+  "updated_at": "2026-09-14T20:19:08.440735+00:00"
 }

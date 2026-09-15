@@ -1,0 +1,4 @@
+
+Skipping AAPL: TypeError: DataManager.add_forward_excess_target() takes from 3 to 4 positional arguments but 5 were given
+Skipping MSFT: TypeError: DataManager.add_forward_excess_target() takes from 3 to 4 positional arguments but 5 were given
+Skipping NVDA: TypeError: DataManager.add_forward_excess_target() takes from 3 to 4 positional arguments but 5 were given

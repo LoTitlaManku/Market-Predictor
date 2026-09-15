@@ -23,6 +23,10 @@ NYSE_CAL = mcal.get_calendar('NYSE')
 def utc_now_naive() -> pd.Timestamp:
     return pd.Timestamp.now(tz="UTC").tz_localize(None)
 
+def normalise_datetime_index(index) -> pd.DatetimeIndex:
+    parsed = pd.to_datetime(index, utc=True, errors="coerce", format="mixed")
+    return pd.DatetimeIndex(parsed.tz_localize(None)).astype("datetime64[ns]")
+
 
 # Helper function to load data for a stock
 def load_data(ticker: str, interval: str = "1d") -> pd.DataFrame | None:
@@ -32,7 +36,7 @@ def load_data(ticker: str, interval: str = "1d") -> pd.DataFrame | None:
     if os.path.exists(cache_file):
         df = pd.read_csv(cache_file, index_col=0, parse_dates=True)
         df.index.name = "Date"
-        df.index = pd.to_datetime(df.index, utc=True).tz_localize(None)
+        df.index = normalise_datetime_index(df.index)
         df = df[~df.index.duplicated(keep="last")].sort_index()
         return df
 
@@ -47,7 +51,7 @@ def load_data(ticker: str, interval: str = "1d") -> pd.DataFrame | None:
         cols: pd.MultiIndex = data.columns # noqa
         data.columns = cols.get_level_values(0)
 
-    data.index = pd.to_datetime(data.index, utc=True).tz_localize(None)
+    data.index = normalise_datetime_index(data.index)
     data.index.name = "Date"
 
     now_utc_naive = utc_now_naive()
@@ -141,26 +145,36 @@ class UpdateWorker:
             failed_tickers = list(shared._ERRORS.keys()) # noqa
             print(f"\nRetrying failed tickers: {failed_tickers}")
             shared._ERRORS = {}
-            extra_data = yf.download(
-                failed_tickers, start=start_date, interval="1d", group_by='ticker', auto_adjust=False, progress=False
-            )
 
-            if extra_data is not None and not extra_data.empty:
-                batch_data = pd.concat([batch_data, extra_data], axis=1)
+            retry_frames: list[pd.DataFrame] = []
+            for ticker in failed_tickers:
+                single_data = yf.download(
+                    ticker, start=start_date, interval="1d",
+                    auto_adjust=False, progress=False,
+                )
+                if single_data is not None and not single_data.empty:
+                    # Match the (Ticker, Price) layout of the batch download.
+                    if not isinstance(single_data.columns, pd.MultiIndex):
+                        single_data.columns = pd.MultiIndex.from_product([[ticker], single_data.columns])
+                    retry_frames.append(single_data)
+
+            if retry_frames:
+                retry_data = pd.concat(retry_frames, axis=1)
+                batch_data = pd.concat([batch_data, retry_data], axis=1)
 
         for ticker in tqdm(ticker_list, desc="Processing 1d"):
             try:
                 new_rows = batch_data[ticker].dropna(how='all')
                 if new_rows.empty: continue
 
-                new_rows.index = pd.to_datetime(new_rows.index, utc=True).tz_localize(None)
+                new_rows.index = normalise_datetime_index(new_rows.index)
                 close = get_day_close(utc_now_naive())
                 if (close is not None and close.normalize() < utc_now_naive() < close
                                       and new_rows.index[-1].date() == close.date()):
                     new_rows = new_rows.iloc[:-1]
 
                 new_rows.index.name = "Date"
-                new_rows.index = pd.to_datetime(new_rows.index, utc=True).tz_localize(None).strftime('%Y-%m-%d %H:%M:%S')
+                new_rows.index = normalise_datetime_index(new_rows.index).strftime('%Y-%m-%d %H:%M:%S')
 
                 cache_path = os.path.join(CACHE_DIR, f"{ticker}_1d.csv")
                 existing_df = load_data(ticker, "1d")
@@ -186,7 +200,7 @@ class UpdateWorker:
             if isinstance(new_data.columns, pd.MultiIndex):
                 new_data.columns = new_data.columns.get_level_values(0)
 
-            new_data.index = pd.to_datetime(new_data.index, utc=True).tz_localize(None)
+            new_data.index = normalise_datetime_index(new_data.index)
             new_data = new_data[new_data.index.notna()]
             new_data.index.name = "Date"
 
@@ -200,7 +214,7 @@ class UpdateWorker:
             updated_df = updated_df[~updated_df.index.duplicated(keep='last')]
             updated_df = updated_df.loc[:, ~updated_df.columns.duplicated()]
             updated_df = updated_df.sort_index()
-            updated_df.to_csv(os.path.join(DATA_DIR, f"{comparative.replace("^", "")}_1h.csv"))
+            updated_df.to_csv(os.path.join(DATA_DIR, f"{comparative.replace("^", "")}_1d.csv"))
 
     @staticmethod
     def sentiment_update():

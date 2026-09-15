@@ -4,6 +4,7 @@ import json
 import os
 import time
 import warnings
+from collections import Counter
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -177,7 +178,9 @@ class DataManager:
 
         return df
 
-    def add_forward_excess_target(self, df: pd.DataFrame, benchmark_close: pd.Series, drop_unlabelled: bool = True) -> pd.DataFrame:
+    def add_forward_excess_target(
+            self, df: pd.DataFrame, benchmark_close: pd.Series, interval: str, drop_unlabelled: bool = True,
+    ) -> pd.DataFrame:
         df = df.copy()
         beta = df["rolling_beta"]
         close = df["Adj Close"]
@@ -266,6 +269,8 @@ class DataManager:
 
         log("")
         frames: list[pd.DataFrame] = []
+        failures: Counter[str] = Counter()
+        empty_after_filters = 0
         for ticker, data in tqdm(data_dict.items()):
             try:
                 data = data.copy()
@@ -287,7 +292,9 @@ class DataManager:
                 df = self.add_forward_excess_target(df, benchmark_close, interval, drop_unlabelled)
                 df = self._apply_liquidity_filters(df, interval)
 
-                if df.empty: continue
+                if df.empty:
+                    empty_after_filters += 1
+                    continue
 
                 df["ticker"] = ticker
                 df["Date"] = df.index
@@ -295,10 +302,19 @@ class DataManager:
                 frames.append(df)
 
             except Exception as e:
-                log(f"Skipping {ticker}: {type(e).__name__}: {e}", prints=False)
-                pass
+                message = f"{type(e).__name__}: {e}"
+                failures[message] += 1
+                log(f"Skipping {ticker}: {message}", prints=False)
 
-        if not frames: raise ValueError("No usable universe data")
+        if not frames:
+            common_failures = "; ".join(
+                f"{count}x {message}" for message, count in failures.most_common(3)
+            )
+            detail = common_failures or f"{empty_after_filters} tickers were empty after filters"
+            raise ValueError(
+                f"No usable universe data from {len(data_dict)} input tickers. "
+                f"Most common failures: {detail}"
+            )
 
         data: pd.DataFrame = pd.concat(frames, axis=0, ignore_index=True)
         data = data.sort_values(["Date", "ticker"])

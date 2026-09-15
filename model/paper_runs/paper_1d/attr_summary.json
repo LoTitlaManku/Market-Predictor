@@ -1,1 +1,9 @@
-{}
+{
+  "total_positive_pnl": 2.1852914034073656,
+  "top_1_pnl": 0.8004084951262025,
+  "top_3_pnl": 1.7351715642601746,
+  "top_5_pnl": 2.1852914034073656,
+  "top_1_share_of_positive_pnl": 0.36627082954620327,
+  "top_3_share_of_positive_pnl": 0.7940229671679704,
+  "top_5_share_of_positive_pnl": 1.0
+}

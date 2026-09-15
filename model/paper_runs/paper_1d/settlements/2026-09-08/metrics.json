@@ -1,0 +1,16 @@
+{
+  "Date": "2026-09-08T00:00:00",
+  "gross_return": -0.011781024649206582,
+  "turnover_cost": 0.00013333333333333334,
+  "daily_return": -0.011914357982539914,
+  "turnover": 4,
+  "holdings": 23,
+  "gross_exposure": 0.7206499320297445,
+  "regime_exposure": 1.0,
+  "held_tickers": "BF-B,BN,BSY,CCK,CSGP,CVCO,EVRG,FRPT,ITW,KVUE,LNT,MGM,MLI,MMYT,NE,PLD,PSA,SFM,TDY,TPL,UTHR,WLK,YUMC",
+  "benchmark_return": -0.007918002902381094,
+  "exec_entry_date": "2026-09-09T00:00:00",
+  "exec_exit_date": "2026-09-10T00:00:00",
+  "missing_position_returns": 0,
+  "settled_at": "2026-09-10T20:20:08.457058+00:00"
+}

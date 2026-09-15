@@ -7,7 +7,7 @@ import talib
 from pykalman import KalmanFilter
 
 from scripts.config import DATA_DIR
-from scripts.data_management import load_comparative_data
+from scripts.data_management import load_comparative_data, normalise_datetime_index
 
 @pd.api.extensions.register_dataframe_accessor("ind")
 class TechnicalAnalysisAccessor:
@@ -16,7 +16,7 @@ class TechnicalAnalysisAccessor:
 
     def add_indicators(self, ticker: str, interval: str, add_targets: bool = True) -> pd.DataFrame:
         df = self._obj.copy()
-        df.index = pd.to_datetime(df.index, utc=True, errors="coerce").tz_localize(None)
+        df.index = normalise_datetime_index(df.index)
         df = df[df.index.notna()]
         df = df[~df.index.duplicated(keep="last")].sort_index()
         df.index = df.index.astype('datetime64[ns]')
@@ -446,13 +446,13 @@ class TechnicalAnalysisAccessor:
     def _add_macro_context(df: pd.DataFrame, interval: str):
         df = df.copy()
 
-        df.index = pd.to_datetime(df.index, utc=True, errors="coerce").tz_localize(None)
+        df.index = normalise_datetime_index(df.index)
         df = df[df.index.notna()]
         df = df[~df.index.duplicated(keep="first")].sort_index()
 
         tyx_data = load_comparative_data("TYX", interval)
         tyx_data.index.name = "Date"
-        tyx_data.index = pd.to_datetime(tyx_data.index, utc=True, errors="coerce").tz_localize(None)
+        tyx_data.index = normalise_datetime_index(tyx_data.index)
         tyx_data = tyx_data[tyx_data.index.notna()]
         tyx_data = tyx_data[~tyx_data.index.duplicated(keep="first")].sort_index()
 
@@ -474,6 +474,9 @@ class TechnicalAnalysisAccessor:
             .sort_values("Date")
             .reset_index(drop=True)
         )
+
+        left["Date"] = left["Date"].astype("datetime64[ns]")
+        right["Date"] = right["Date"].astype("datetime64[ns]")
 
         merged = pd.merge_asof(
             left,
